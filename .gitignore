@@ -1,0 +1,17 @@
+# Never commit game files, builds, keys or saves. Bring your own APK.
+*.apk
+*.apks
+*.xapk
+*.idsig
+*.so
+*.h.gch
+*.keystore
+*.jks
+*.key
+accounts.json
+accounts.json.tmp
+out/
+game/
+captures/
+/cmserver/cmserver
+result
