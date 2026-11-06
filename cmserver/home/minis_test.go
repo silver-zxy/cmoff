@@ -40,14 +40,15 @@ func TestMiniQuests(t *testing.T) {
 	if a.MiniQuests[0].Progress != 1 {
 		t.Fatalf("not counted %+v", a.MiniQuests)
 	}
-	id := a.MiniQuests[0].ID
+	id, last := a.MiniQuests[0].ID, a.QuestID
 	if !a.ClaimQuest(&Reward{}, id) || a.MiniSteps[miniCharRows[0]] != 1 {
 		t.Fatalf("claim %+v %v", a.MiniQuests, a.MiniSteps)
 	}
-	// its next step (win 3) took its place
+	// its next step (win 3) took its place, with the next id, as the
+	// client hands it out
 	found := false
 	for _, q := range a.MiniQuests {
-		found = found || (q.Index == 1 && !q.Claimed)
+		found = found || (q.Index == 1 && !q.Claimed && q.ID == last+1)
 	}
 	if !found || len(a.MiniQuests) != miniQuestsShown {
 		t.Fatalf("next step %+v", a.MiniQuests)
@@ -74,17 +75,18 @@ func TestMiniQuests(t *testing.T) {
 				q = mq
 			}
 		}
-		mini, _ := miniOfQuest(q)
+		mini, step := miniOfQuest(q)
 		e, ok := events[c.event]
-		if !ok || q.ID == 0 || c.event != miniChainEvent(q) || c.step != 0 || c.quest.Index != 0 {
-			t.Fatalf("chain %+v (mini %d) events %v", c, mini, len(events))
+		if !ok || q.ID == 0 || c.event != miniChainEvent(mini) || c.step != step || c.quest.Index != step {
+			t.Fatalf("chain %+v (mini %d step %d) events %v", c, mini, step, len(events))
 		}
 		var p struct {
 			Chain    []map[string]any
 			Category string
 		}
-		if err := json.Unmarshal([]byte(e.Parameters), &p); err != nil || len(p.Chain) != 1 || p.Category != "Tutorial" ||
-			p.Chain[0]["RequirementMini"] != Data.CharName(miniCharRows[mini]) {
+		if err := json.Unmarshal([]byte(e.Parameters), &p); err != nil || len(p.Chain) != 3 || p.Category != "Tutorial" ||
+			p.Chain[0]["PieceRequirementType"] != "MiniFromList" ||
+			p.Chain[0]["WinWithUnit"].(map[string]any)["UnitList"].([]any)[0] != Data.CharName(miniCharRows[mini]) {
 			t.Fatalf("%v %s", err, e.Parameters)
 		}
 	}

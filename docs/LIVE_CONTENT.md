@@ -302,18 +302,20 @@ Fifth test: still the old quest again, without rewards. Two causes:
   Competitive 5). For every owned mini: win 1, 3 and 5 matches using it,
   one after the other (digistatement), reward quest_Daily_Mini (1 Pony
   Fuel and a mini fragment, as on the screenshots).
-- Ours: one QUEST_CHAIN event per open mini quest, a chain of just that
-  quest (1100 + its index: mini * 3 + step; Category Tutorial). A chain's
+- Ours: one QUEST_CHAIN event per mini with an open quest (1100 + the
+  mini's index; Chain: win 1, 3, 5 with it; Category Tutorial). A chain's
   quest goes in the quest manager's chains' state, not the active list:
-  per chain a LogicLong (event id, ours 0) and a Bool + the quest
+  per chain a LogicLong (event id, ours the step) and a Bool + the quest
   (+0x40 / +0x50; encoder 0x31b91c, decoder 0x4bd2d8). The client looks
-  each chain's event up by the key's id (0x7a3250) and the quest screen
-  shows the chain's quest; a claim frees the chain's slot (0x7b170c).
-  In the active list (0077, 0080) the button counted them but the screen
-  did not show them (0081). With all three steps in one chain (0081) the
-  client handed out the next step itself after a claim, and it showed
-  "<name>" (no mini) until the next home; with one quest per chain the
-  next step comes with the next home, after the next match (0082).
+  each chain's event up by the key's id (0x7a3250), the quest screen
+  shows the chain's quest; a claim frees the slot (0x7b170c) and the
+  client hands out the chain's next step itself, as the server does
+  (claimMiniQuest, the next quest id).
+- The live quest data names the unit its own way (WinWithUnit 0x974bb0:
+  the kind's object with UseRoundWins, PieceRequirementType None / Mini /
+  MiniFromList (0x31aec4), UnitList the names, resolved by name through
+  table 6). With RequirementMini only (0081) the next step had no mini
+  and showed "<name>"; 0082 worked around it, 0083 sends MiniFromList.
 
 ## Boards (`home/boards.go`)
 

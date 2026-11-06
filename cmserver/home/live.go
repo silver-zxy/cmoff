@@ -242,10 +242,23 @@ func (q questDef) json() map[string]any {
 		"Rewards":      chestNames(q.Rewards),
 	}
 	if q.Own != nil {
-		m[q.Kind] = q.Own
+		own := map[string]any{}
+		for k, v := range q.Own {
+			own[k] = v
+		}
+		// the live quest data names its unit differently from the quest
+		// (WinWithUnit's 0x974bb0: PieceRequirementType None / Mini /
+		// MiniFromList, UnitList the names, through table 6 by name); with
+		// RequirementMini only, a quest the client made from it had no mini
+		// and showed "<name>"
+		if name, ok := q.Own["RequirementMini"].(string); ok && name != "" {
+			own["PieceRequirementType"] = "MiniFromList"
+			own["UnitList"] = []string{name}
+		}
+		m[q.Kind] = own
 		// also at the quest's top level: the kinds' readers may take
 		// their keys from there
-		for k, v := range q.Own {
+		for k, v := range own {
 			m[k] = v
 		}
 	}

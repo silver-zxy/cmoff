@@ -397,11 +397,11 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 	}
 	w.VInt(int32(len(open)))
 	for _, q := range open {
-		// one quest per chain (miniChainEvent): its index in the chain 0
-		w.Int(miniChainEvent(q))
-		w.Int(0)
+		mini, step := miniOfQuest(q)
+		w.Int(miniChainEvent(mini))
+		w.Int(step)
 		w.Bool(true)
-		writeQuest(w, q, chain[q.Index], miniChainEvent(q), 0, questCategoryMini, questsEnd(d))
+		writeQuest(w, q, chain[q.Index], miniChainEvent(mini), step, questCategoryMini, questsEnd(d))
 	}
 	vints(w, 2) // the other lists (+0xa0, ...)
 }
