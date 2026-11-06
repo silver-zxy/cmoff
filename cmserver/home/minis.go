@@ -2,6 +2,7 @@ package home
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -22,9 +23,14 @@ import (
 // the screen did not list. With the end time they are on again.
 var miniQuestsOn = true
 
-// miniChainEvent: the chronos event of a mini's quest chain, one per mini
-// (a chain shows one quest at a time; three minis, three chains).
-func miniChainEvent(mini int) int32 { return 1100 + int32(mini) }
+// miniChainEvent: the chronos event of one mini quest: a QUEST_CHAIN of
+// just that quest (1100 + its index, mini * 3 + step). A longer chain made
+// the client hand out the next step itself after a claim, and that quest
+// showed "<name>" (its mini was missing) until the home was loaded again.
+// With one quest per chain a claim ends the chain; the next step comes
+// with the next home, that is after the next match (the only thing that
+// moves a mini quest).
+func miniChainEvent(q Quest) int32 { return 1100 + q.Index }
 
 // miniOfQuest: a mini quest's mini (index into miniCharRows) and step.
 func miniOfQuest(q Quest) (int, int32) {
@@ -56,15 +62,10 @@ func miniChain() []questDef {
 	return out
 }
 
-// miniChainLiveEvent: the QUEST_CHAIN event of one mini: win 1, 3, 5.
-func miniChainLiveEvent(mini int) LiveEvent {
-	chain := miniChain()
-	var list []any
-	for _, q := range chain[mini*len(miniQuestWins) : (mini+1)*len(miniQuestWins)] {
-		list = append(list, q.json())
-	}
+// miniChainLiveEvent: the QUEST_CHAIN event of one open mini quest.
+func miniChainLiveEvent(q Quest) LiveEvent {
 	b, _ := json.Marshal(map[string]any{
-		"Chain":          list,
+		"Chain":          []any{miniChain()[q.Index].json()},
 		"Category":       "Tutorial",
 		"LoopWhenDone":   false,
 		"LevelLimitLow":  0,
@@ -74,8 +75,9 @@ func miniChainLiveEvent(mini int) LiveEvent {
 	day := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 	start := int32(day.AddDate(0, 0, -1).Unix())
 	end := int32(day.AddDate(0, 0, 30).Unix())
+	mini, step := miniOfQuest(q)
 	return LiveEvent{
-		ID: miniChainEvent(mini), Name: "mini_quests_" + Data.CharName(miniCharRows[mini]),
+		ID: miniChainEvent(q), Name: fmt.Sprintf("mini_quest_%s_%d", Data.CharName(miniCharRows[mini]), step+1),
 		Type: EventQuestChain, Start: start, End: end, VisibleStart: start, VisibleEnd: end,
 		Parameters: string(b),
 	}
@@ -89,8 +91,7 @@ func (a *Account) miniChainEvents() []LiveEvent {
 	}
 	for _, q := range a.MiniQuests {
 		if !q.Claimed {
-			mini, _ := miniOfQuest(q)
-			out = append(out, miniChainLiveEvent(mini))
+			out = append(out, miniChainLiveEvent(q))
 		}
 	}
 	return out

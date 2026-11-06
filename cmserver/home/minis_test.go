@@ -74,16 +74,16 @@ func TestMiniQuests(t *testing.T) {
 				q = mq
 			}
 		}
-		mini, step := miniOfQuest(q)
+		mini, _ := miniOfQuest(q)
 		e, ok := events[c.event]
-		if !ok || q.ID == 0 || c.event != miniChainEvent(mini) || c.step != step || c.quest.Index != step {
-			t.Fatalf("chain %+v (mini %d step %d) events %v", c, mini, step, len(events))
+		if !ok || q.ID == 0 || c.event != miniChainEvent(q) || c.step != 0 || c.quest.Index != 0 {
+			t.Fatalf("chain %+v (mini %d) events %v", c, mini, len(events))
 		}
 		var p struct {
 			Chain    []map[string]any
 			Category string
 		}
-		if err := json.Unmarshal([]byte(e.Parameters), &p); err != nil || len(p.Chain) != 3 || p.Category != "Tutorial" ||
+		if err := json.Unmarshal([]byte(e.Parameters), &p); err != nil || len(p.Chain) != 1 || p.Category != "Tutorial" ||
 			p.Chain[0]["RequirementMini"] != Data.CharName(miniCharRows[mini]) {
 			t.Fatalf("%v %s", err, e.Parameters)
 		}
