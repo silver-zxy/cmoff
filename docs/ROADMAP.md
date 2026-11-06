@@ -92,12 +92,14 @@ Still to do:
   | Prince charges 3 enemies in a match | 10 Crystal Coins, 10 gems |
   | 6 matches with Royal Champion | 15 Crystal Coins |
 
-### A4. Crystal Coins
+### A4. Crystal Coins (0065, 0074; to test)
 
-- Done in 0065: the server counts PromotionToken ("Crystal Coin", at most
-  9999) from chests and shows it in the home.
-- To do: from fragments past a unit's max level (the client's rule,
-  0x7d7550), and spending them (A5).
+- The server counts PromotionToken ("Crystal Coin", at most 9999) from
+  chests and shows it in the home.
+- Fragments beyond a unit's max level become 1 Crystal Coin each, as the
+  client does (0x7d7550; collectibles.json fragmentToRes); fragments saved
+  past max level before 0074 turn into coins once at the start.
+- Spending them: with A5.
 
 ### A5. Skins locked, unlocked as in the original
 

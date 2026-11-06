@@ -148,3 +148,43 @@ func TestCrystalCoins(t *testing.T) {
 		t.Fatalf("slots %+v", m.avatar.slots[0])
 	}
 }
+
+// Fragments beyond a unit's max level become Crystal Coins, one each, as
+// the client turns them (0x7d7550).
+func TestExcessFragmentsToCoins(t *testing.T) {
+	a := NewAccount()
+	a.StartProgression()
+	maxed, near := miniID(5), miniID(6)
+	a.entry(maxed).Level = maxMiniLevel
+	a.entry(near).Level, a.entry(near).Fragments = 3, 1 // needs 3 for level 4
+	r := &Reward{}
+	a.applyContent(r, ChestContent{Fragments: map[int32]int32{maxed: 2, near: 5}})
+	if a.CrystalCoins != 2+3 || r.CrystalCoins != 5 {
+		t.Fatalf("coins %d %+v", a.CrystalCoins, r)
+	}
+	if a.owned(maxed).Fragments != 0 || a.owned(near).Fragments != 3 || r.Fragments[near] != 2 {
+		t.Fatalf("fragments %+v %+v %+v", a.owned(maxed), a.owned(near), r.Fragments)
+	}
+	// a hero at level 9 needs 300 for level 10
+	h := heroID(12)
+	a.entry(h).Level = 9
+	a.applyContent(r, ChestContent{Fragments: map[int32]int32{h: 325}})
+	if a.owned(h).Fragments != 300 || a.CrystalCoins != 5+25 {
+		t.Fatalf("hero %+v coins %d", a.owned(h), a.CrystalCoins)
+	}
+}
+
+// Fragments saved past max level (before the server turned them into
+// coins) become coins at the start.
+func TestCatchUpExcessFragments(t *testing.T) {
+	a := NewAccount()
+	a.StartProgression()
+	a.entry(miniID(5)).Level, a.entry(miniID(5)).Fragments = maxMiniLevel, 4
+	a.entry(heroID(12)).Level, a.entry(heroID(12)).Fragments = 9, 310
+	if n := a.excessToCoins(&Reward{}); n != 14 || a.CrystalCoins != 14 || a.owned(miniID(5)).Fragments != 0 || a.owned(heroID(12)).Fragments != 300 {
+		t.Fatalf("%d coins %d %+v", n, a.CrystalCoins, a.Collection)
+	}
+	if n := a.excessToCoins(&Reward{}); n != 0 {
+		t.Fatal("twice")
+	}
+}

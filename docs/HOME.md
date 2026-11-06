@@ -75,6 +75,16 @@ in `home/skins.go`. Skins are also written as collectibles (level 1).
 | tutorial flags (+0x130) | 0x100: skip the tutorial battle |
 | name set by user (+0x135) | the account's `name_set`; false shows the first-start name dialog |
 
+## Crystal Coins
+
+The resource PromotionToken (resources.csv row 13, at most 9999), sent as a
+second entry of the avatar's data slot list 0 next to the gold. The client
+turns fragments a unit gets beyond its max level into coins itself
+(0x7d7550: it keeps what the unit still needs up to its max level,
+0x976874, and gives `fragmentToRes` × the rest, 1 PromotionToken per
+fragment for every mini and hero in collectibles.json); the server does the
+same in `addFragments`, else the next home reset the coins.
+
 ## Progression (`home/collection.go`)
 
 With `progression` on, the account owns only what it earned:

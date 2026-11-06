@@ -126,7 +126,20 @@ func (a *Account) OpenChest(rng *rand.Rand, r *Reward, id int32) error {
 	return nil
 }
 
+// addFragments gives a unit fragments as the client does (0x7d7550): only
+// as many as it still needs up to its max level; every fragment beyond is
+// one Crystal Coin (collectibles.json fragmentToRes: 1 PromotionToken, the
+// same for every mini and hero).
 func (a *Account) addFragments(r *Reward, id, n int32) {
+	if class := id / 1_000_000; (class == classSEASONAL || class == classSupportHero) && n > 0 {
+		if missing := max(a.fragmentsMissing(id), 0); n > missing {
+			a.addCrystalCoins(r, n-missing)
+			n = missing
+		}
+	}
+	if n <= 0 {
+		return
+	}
 	a.entry(id).Fragments += n
 	if r.Fragments == nil {
 		r.Fragments = map[int32]int32{}
@@ -292,9 +305,13 @@ func (a *Account) CatchUp() string {
 			a.queueChestFrom(r, upgradeRewardChest, sourceUpgrade, upgradeExpContent())
 		}
 	}
+	coins := int32(0)
+	if a.Progression {
+		coins = a.excessToCoins(r)
+	}
 	starter := a.catchUpStarter(r)
 	a.Unlock()
-	if len(r.Unlocked) == 0 && len(r.Upgraded) == 0 && !starter {
+	if len(r.Unlocked) == 0 && len(r.Upgraded) == 0 && !starter && coins == 0 {
 		return ""
 	}
 	if err := a.Save(); err != nil {
@@ -303,5 +320,26 @@ func (a *Account) CatchUp() string {
 	if starter {
 		return "caught up with the start (starting chests, gold, gems): " + r.String()
 	}
+	if coins > 0 && len(r.Unlocked) == 0 && len(r.Upgraded) == 0 {
+		return fmt.Sprintf("caught up: %d fragments past max level became Crystal Coins (%d now)", coins, a.CrystalCoins)
+	}
 	return "caught up with the client's own upgrades: " + r.String()
+}
+
+// excessToCoins turns fragments a unit holds beyond what it needs up to its
+// max level into Crystal Coins, as the client does when they come (saved
+// before the server did the same, 0074).
+func (a *Account) excessToCoins(r *Reward) (coins int32) {
+	for id, o := range a.Collection {
+		if class := id / 1_000_000; class != classSEASONAL && class != classSupportHero {
+			continue
+		}
+		if extra := -a.fragmentsMissing(id); extra > 0 && o.Fragments >= extra {
+			o.Fragments -= extra
+			before := a.CrystalCoins
+			a.addCrystalCoins(r, extra)
+			coins += a.CrystalCoins - before
+		}
+	}
+	return coins
 }
