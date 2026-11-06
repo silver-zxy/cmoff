@@ -119,7 +119,9 @@ Still to do:
 
 ### A5. Skins locked, unlocked as in the original
 
-- Locked at the start (now all open).
+- Locked at the start (now all open). Decided: every account, the
+  existing ones too, starts with the skins locked as in the original;
+  they are unlocked again through the road, the quests and the shop.
 - Unlocked by: the road (Plush P.E.K.K.A, Luchador Monk), the Clashmas
   quests (Candy Elf), the shop (Jolly, Helpful, Crystal P.E.K.K.A,
   Fabulous Prince, the Clashmas Skins bundle).
