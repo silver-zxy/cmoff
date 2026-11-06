@@ -125,11 +125,11 @@ func TestUnlockCollectableParse(t *testing.T) {
 }
 
 func TestBattleSignalLen(t *testing.T) {
-	n := BattleSignalLen(3, false, 13, 10, 4)
-	if n%4 != 3 || n/4%2 != 0 || n/8%16 != 13 || n/128%11 != 10 || n/1408 != 4 {
+	n := BattleSignalLen(3, false, 13, 10, 4, 3)
+	if n%4 != 3 || n/4%2 != 0 || n/8%16 != 13 || n/128%11 != 10 || n/1408%5 != 4 || n/7040%8 != 3 {
 		t.Fatalf("%d does not decode", n)
 	}
-	if BattleSignalLen(2, true, 0, 0, 0) != 6 {
+	if BattleSignalLen(2, true, 0, 0, 0, 0) != 6 {
 		t.Fatal("hold")
 	}
 }

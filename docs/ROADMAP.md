@@ -35,6 +35,14 @@ the phone before the next.
 
 ## Part A: what we know
 
+### A0. Boards by league (0071, 0072; to test)
+
+- Season 1's game modes by league (game_modes.csv): Silver plays on
+  Electro Valley and Healing Temple, Gold and up also on Banquet Hall;
+  Bronze stays on Windy Plains. The mapping goes out as GAME_MODE_MAPPING;
+  for bot battles the server picks the board and the hook sets it on the
+  bot (the client took the mapping, but bot battles keep the bot's board).
+
 ### A1. Bots as in the original (patch 0064, to test)
 
 - The bots keep their decks' own levels from bot_decks.csv (93 decks by

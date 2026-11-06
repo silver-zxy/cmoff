@@ -275,6 +275,9 @@ func (a *Account) ownHome() ownHomeData {
 	h.chestIndex = a.ChestIndex
 	h.daily = a.dailyGold()
 	h.events = LiveEvents()
+	if e, ok := gameModeLiveEvent(a.Trophies); ok {
+		h.events = append(h.events, e)
+	}
 	if Live {
 		a.refreshQuests()
 		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken()}

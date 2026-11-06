@@ -371,7 +371,7 @@ func TestDailyQuests(t *testing.T) {
 	h := a.ownHome()
 	h.home.skinStore = false
 	m, err := decode(h.encode())
-	if err != nil || len(m.home.quests.quests) != 3 || len(m.home.events) != 3 || m.home.events[0].Type != EventQuestPool || m.home.events[1].Type != EventSeasonData || m.home.events[2].Type != EventShopLayout {
+	if err != nil || len(m.home.quests.quests) != 3 || len(m.home.events) != 4 || m.home.events[3].Type != EventGameModeMapping || m.home.events[0].Type != EventQuestPool || m.home.events[1].Type != EventSeasonData || m.home.events[2].Type != EventShopLayout {
 		t.Fatalf("%v quests %+v events %d", err, m.home.quests.quests, len(m.home.events))
 	}
 	if fmt.Sprint(lastPoolState) != fmt.Sprint([]int32{dailyPoolEvent, 4, 0, 1, 3, 4, 5, 6}) {

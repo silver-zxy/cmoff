@@ -31,11 +31,13 @@ type Options struct {
 // values back from the frame length (cmoffline.c, feed()).
 //
 //	mode + 4*hold + 8*bot config + 128*bot hero level + 1408*bot mini level
+//	     + 7040*board
 //
 // mode 2/3, hold 0/1, config 0-15, hero level 0-10, mini level 0-4 (0 =
-// leave the bot's own levels).
-func BattleSignalLen(mode int32, hold bool, cfg, hero, mini int32) int {
-	n := int(mode%4) + 8*int(cfg%16) + 128*int(hero%11) + 1408*int(mini%5)
+// leave the bot's own levels), board 0-7 (locations item + 1, 0 = the
+// npc's own).
+func BattleSignalLen(mode int32, hold bool, cfg, hero, mini, board int32) int {
+	n := int(mode%4) + 8*int(cfg%16) + 128*int(hero%11) + 1408*int(mini%5) + 7040*int(board%8)
 	if hold {
 		n += 4
 	}
@@ -238,11 +240,12 @@ func (s *Server) handle(c net.Conn) {
 				s.acc.Lock()
 				trophies := s.acc.Trophies
 				hero, mini := s.acc.BotLevels()
+				board, boardName := s.acc.NextBoard()
 				s.acc.Unlock()
 				cfg := home.BotConfig(trophies)
 				var pad []byte
 				if !s.opts.SignalEmpty {
-					pad = make([]byte, BattleSignalLen(mode, !s.opts.BattleOnline, cfg, hero, mini))
+					pad = make([]byte, BattleSignalLen(mode, !s.opts.BattleOnline, cfg, hero, mini, board))
 				}
 				s.mu.Lock()
 				s.pending = battle{mode: mode, ranked: ranked}
@@ -255,8 +258,8 @@ func (s *Server) handle(c net.Conn) {
 				if hero > 0 {
 					levels = fmt.Sprintf("bot levels hero %d mini %d", hero, mini)
 				}
-				log.Printf("-> battle signal (mode %d, %s, bot config %d for %d trophies, %s, %s)",
-					mode, kind, cfg, trophies, home.LeagueName(trophies), levels)
+				log.Printf("-> battle signal (mode %d, %s, bot config %d for %d trophies, %s, %s, board %s)",
+					mode, kind, cfg, trophies, home.LeagueName(trophies), levels, boardName)
 				s.send(c, sess, proto.KeepAliveOk, pad)
 			}
 
@@ -445,6 +448,7 @@ func (s *Server) sendHome(c net.Conn, sess *pepper.Session) {
 	if home.Live {
 		k, pts, claimed := s.acc.SeasonSummary()
 		log.Printf("-> home with adventure road: season %d, %d pony fuel, claimed up to %d", k, pts, claimed)
+		log.Printf("-> home with game modes: %s", s.acc.GameModeSummary())
 	}
 	s.send(c, sess, proto.OwnHomeData, s.acc.OwnHomeData())
 }

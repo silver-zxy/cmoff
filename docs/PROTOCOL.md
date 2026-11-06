@@ -136,12 +136,14 @@ The client's offline duel is started by the hook, not the server
 KeepAliveServer (20108) the client never asked for, padded with
 
     mode + 4 × hold + 8 × bot config + 128 × bot hero level + 1408 × bot mini level
+         + 7040 × board
 
 bytes (`srv.BattleSignalLen`; mode 2/3, hold = keep the battle offline
 throughout, an experiment; bot config 0–15 by the account's trophies
 (`home.BotConfig`); bot levels 0 = the decks' own (bot_decks.csv, by league,
 with progression), else every deck at them (10 and 4 for the unlocked
-collection)). The decoder of 20108 reads nothing, so the
+collection); board = the board's locations item + 1 of the bot battle's board, 0 = the
+npc's own (`home.BoardFor`)). The decoder of 20108 reads nothing, so the
 padding is harmless; the hook reads it from the plaintext frame length
 (ciphertext = body + 16).
 

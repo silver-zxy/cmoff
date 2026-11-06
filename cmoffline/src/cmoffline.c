@@ -216,6 +216,15 @@ static void install_crash_logger(void) {}
  * unlocked collection, no progression) it sets every deck to them. The
  * generated decks (BOT_DECK_NORMAL / NEWBIE / RANDOM) are not in the table. */
 #define LIBG_BOTDECK_TABLE 0x1080b70
+/* Boards (locations.csv, table *(libg+0x10807c0), looked up by 0x82312c):
+ * items WindyPlains 0, VampireCastle 1 (Banquet Hall), ElectroValley 2,
+ * HealingTemple 3, FishTown 4 (each two CSV lines: their row indexes are
+ * 0, 2, 4, 6, 8). A PvE battle plays on its npc's board,
+ * resolved at load into npc +0x38 (0x47d8dc, "No location in NPC level");
+ * the game mode's own boards are not used for it. The server picks one of
+ * the league's Season 1 boards and sends item + 1 (0: the npc's own). */
+#define LIBG_LOCATION_TABLE 0x10807c0
+#define NPC_LOCATION        0x38
 #define BOTDECK_MAX        256
 #define BOTDECK_MINIS      8
 #ifndef BOT_CONFIGS
@@ -251,6 +260,7 @@ static volatile int pending_mode;       /* >0: start an offline battle */
 static volatile int pending_hold;       /* keep the offline flag for the whole battle */
 static volatile int pending_bot;        /* bot config from the server, 0 = random */
 static volatile int pending_hero_level; /* bot levels from the server, 0 = the decks' own */
+static volatile int pending_board;      /* locations item + 1 from the server, 0 = the npc's own */
 static volatile int pending_mini_level;
 static volatile int battle_mode;        /* mode of the battle being played */
 static volatile int tutorial;           /* the client plays its tutorial offline */
@@ -279,7 +289,8 @@ static void feed(struct framer *fr, const uint8_t *p, size_t n, int incoming) {
         if (id != MSG_KEEPALIVE_OK) continue;
         if (len > MAC_LEN) {
             /* padding = mode + 4*hold + 8*bot config + 128*bot hero
-             * level + 1408*bot mini level (cmserver BattleSignalLen) */
+             * level + 1408*bot mini level + 7040*board (cmserver
+             * BattleSignalLen) */
             int v = (int)(len - MAC_LEN);
             if (v == 1) {
                 /* mode 1: a new player's tutorial. Its NPC battles are built
@@ -296,14 +307,15 @@ static void feed(struct framer *fr, const uint8_t *p, size_t n, int incoming) {
             pending_bot = v / 8 % 16;
             pending_hero_level = v / 128 % 11;
             pending_mini_level = v / 1408 % 5;
-            LOG("battle signal from server, mode %d, bot config %d, bot levels hero %d mini %d%s",
-                pending_mode, pending_bot, pending_hero_level, pending_mini_level,
+            pending_board = v / 7040 % 8;
+            LOG("battle signal from server, mode %d, bot config %d, bot levels hero %d mini %d, board %d%s",
+                pending_mode, pending_bot, pending_hero_level, pending_mini_level, pending_board,
                 pending_hold ? ", hold" : "");
         } else if (__atomic_sub_fetch(&keepalives_out, 1, __ATOMIC_SEQ_CST) < 0) {
             keepalives_out = 0;
             pending_hold = 0;
             pending_bot = 0;
-            pending_hero_level = pending_mini_level = 0;
+            pending_hero_level = pending_mini_level = pending_board = 0;
             pending_mode = 2;
             LOG("unrequested KeepAliveServer -> duel");
         }
@@ -449,6 +461,40 @@ static void choose_bot(int config) {
     rng = rng * 1103515245u + 12345u;
     *cfg = config > 0 ? config : configs[(rng >> 16) % (sizeof configs / sizeof configs[0])];
     LOG("bot: config %d (bot_configs.csv)%s", *cfg, config > 0 ? "" : ", random");
+}
+
+/* The board of the next bot battle: locations item board-1, or with 0
+ * the npc's own (saved the first time it is changed). */
+static void choose_board(int board) {
+    static uint8_t *own;
+    static int saved;
+    uint8_t *npcs = *(uint8_t **)G(LIBG_NPC_TABLE);
+    uint8_t *locs = *(uint8_t **)G(LIBG_LOCATION_TABLE);
+    if (!npcs || !locs) { LOG("board: tables not loaded"); return; }
+    void **nvt = *(void ***)npcs, **lvt = *(void ***)locs;
+    if (((int (*)(void *))nvt[0x30 / 8])(npcs) <= NPC_OFFLINE_ROW) return;
+    uint8_t *npc = ((uint8_t *(*)(void *, int))nvt[0x38 / 8])(npcs, NPC_OFFLINE_ROW);
+    if (!npc) return;
+    uint8_t **slot = (uint8_t **)(npc + NPC_LOCATION);
+    if (!saved) {
+        if (board <= 0) return; /* nothing changed yet */
+        own = *slot;
+        saved = 1;
+    }
+    uint8_t *loc = own;
+    if (board > 0) {
+        /* item board-1 of the table: the boards in the CSV's order. Each
+         * board spans two CSV lines, so the row index (item +0x10, +8) is
+         * the line, 2 * item: it is only logged. */
+        int count = ((int (*)(void *))lvt[0x30 / 8])(locs);
+        if (board > count) { LOG("board: item %d of %d", board - 1, count); return; }
+        loc = ((uint8_t *(*)(void *, int))lvt[0x38 / 8])(locs, board - 1);
+        if (!loc) return;
+        uint8_t *row = *(uint8_t **)(loc + 0x10);
+        LOG("board: item %d, CSV line %d", board - 1, row ? *(int32_t *)(row + 8) : -1);
+    }
+    *slot = loc;
+    LOG("board: %s", board > 0 ? "the server's" : "the npc's own");
 }
 
 /* ---- battle result -------------------------------------------------------
@@ -760,6 +806,7 @@ static void battles_main(void) {
                 continue;
             }
             choose_bot(pending_bot);
+            choose_board(pending_board);
             battle_mode = pending_mode;
             level_bot_decks(pending_hero_level, pending_mini_level);
             *offline = 1;

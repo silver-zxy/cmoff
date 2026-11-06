@@ -262,3 +262,31 @@ Fifth test: still the old quest again, without rewards. Two causes:
   PlayGameMode 26 (state classes by 0x506b4c, their writers at vtable
   +0x18). The battle kinds (rounds, knock outs, rerolls, 3:0) need what
   happened in the battle, which the hook does not report yet.
+
+## Boards (`home/boards.go`)
+
+- A battle's board (locations.csv) comes from its game mode's LocationData
+  (game_modes.csv). Without a server the client uses Autochess_2_Player /
+  Autochess_8_Player (0x787b34: mode 2 / 3).
+- GAME_MODE_MAPPING (LogicLiveGameModeMappingData 0x34cd28): `SoloMode`
+  (mode 2) and `TournamentMode` (mode 3), each (0x862cb4) `Status`
+  (Default, Disabled, OverrideGameMode), `OverrideGameMode` (a
+  game_modes.csv name) and optional `LocationsByRank` (0x817b4c: entries of
+  `Location`, `RankLimitLow`, `RankLimitHigh`, 0x4ae248);
+  `LevelLimitLow/High`. The client finds the active mapping (0x7e9d58) when
+  it builds a battle (0x787b34), the offline bot battle included (home
+  update 0x467e78 → 0x940664, the selection as its fifth argument).
+- Season 1's modes by league: Silver `Autochess_{2,8}_Season_1_Silver`
+  (Electro Valley, Healing Temple), Gold and up `…_Season_1_Gold+`
+  (Banquet Hall = VampireCastle, Healing Temple, Electro Valley). Fish
+  Town is Season 2's. Bronze keeps the plain modes (the Basic modes list
+  no boards).
+- Ours: the home carries the mapping for the account's league (0071).
+  The client takes it (StartMatchmake then carries its event id, 4001),
+  but a bot battle is PvE and plays on its npc's board (npcs.csv
+  OfflineMatchNPC Location = WindyPlains; npc +0x38, resolved at load by
+  0x47d8dc). So the server picks one of the league's Season 1 boards for
+  every bot battle (`home.BoardFor`) and sends it with the battle signal;
+  the hook points the npc at it (`choose_board`: item n of the locations table
+  `*(libg+0x10807c0)`; not the CSV row, which is line 2n) and back to
+  its own board in Bronze (0072).

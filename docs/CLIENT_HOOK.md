@@ -66,6 +66,15 @@ config in the signal the hook picks one at random from `BOT_CONFIGS`
 - `table+0x10` = columns, `column+0x18` = int cells (0x535e08 → 0x72c69c → 0x817a60)
 - column index of BotConfigIndex: global libg+0xf57740 (loader 0x8c2b44)
 
+**Boards.** A bot battle plays on OfflineMatchNPC's board (npc +0x38, a
+LogicLocationData resolved at load by 0x47d8dc). The signal's board
+(the board's item + 1 in the locations table `*(libg+0x10807c0)`: Windy
+Plains 0, Banquet Hall 1, Electro Valley 2, Healing Temple 3, Fish Town 4)
+makes the hook point it at that item; 0 puts the npc's own board back
+(saved the first time). Not by CSV row: each board spans two CSV lines, so
+item n is on line 2n (0072 looked them up by row and put Banquet Hall in
+Silver).
+
 **Bot levels as in the original.** Bot decks carry their own levels by
 league (Bronze: heroes 1–4, minis 1–2; Diamond 6–7; Grandmaster and the FF
 decks 10 and 4). With progression the server sends 0 and the decks keep them.
