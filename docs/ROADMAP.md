@@ -82,10 +82,12 @@ Still to do:
   3:0, Clash and upgrades on the battle's copies (battle +0x238 per
   player) and the hook reports them after the battle. Rounds and 3:0 the
   server also counts from the hook's rounds (0078).
-- Mini quests (0077, on again 0080, to test): win 1, 3, 5 matches using
+- Mini quests (0077, 0080; in the chains' state 0081, to test): win 1, 3, 5 matches using
   each owned mini, three at a time, quest_Daily_Mini; category 3 (MINI
   QUESTS). They were missing on the quest screen because it lists only
-  quests not ended (0x753e88, +0x1c), and we sent 0 (fixed in 0079).
+  quests not ended (0x753e88, +0x1c), and we sent 0 (fixed in 0079),
+  and a chain's quest belongs in the chains' state, one chain event per
+  mini (0081).
 - Clashmas quests: the quest group (event type 6) with the Candy Elf
   (shop_skin_SpearGoblinElf, icon_xmas_quest); the 6 known:
 

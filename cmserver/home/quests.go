@@ -366,37 +366,9 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 	for _, q := range active {
 		list = append(list, shown{q, pool[q.Index], dailyPoolEvent, questCategoryDaily})
 	}
-	chain := miniChain()
-	for _, q := range s.mini {
-		if miniQuestsOn && !q.Claimed && int(q.Index) < len(chain) {
-			list = append(list, shown{q, chain[q.Index], miniChainEvent, questCategoryMini})
-		}
-	}
 	w.VInt(int32(len(list)))
 	for _, e := range list {
-		q, def := e.q, e.def
-		w.VInt(e.event)
-		w.VInt(q.Index)
-		w.VInt(def.TypeID)
-		// the kind's state (0x506b4c makes it by kind; its vtable+0x18
-		// writes it): MetaUpgrade two bools (0xea0478), WinRumble nothing
-		// (0xeb3fe0), PlayGameMode the mode, 2_PLAYER 2 / RUMBLE 3
-		// (0xec3568, 0x86517c)
-		w.Bool(true)
-		def.encodeState(w)
-		w.String(def.Text)
-		w.VInt(q.ID)
-		w.VInt(q.Progress)
-		w.VInt(def.Target)
-		w.VInt(0) // +0x30
-		w.VInt(e.category)
-		intList(w, def.Rewards)
-		w.String("") // +0x58
-		w.VInt(0)    // +0x18
-		// +0x1c: the end time (unix seconds, as the events'). A battle
-		// copies only the quests not yet ended (0x4f6854: +0x1c > now), so
-		// with 0 the battle had none and counted nothing.
-		w.VInt(questsEnd(d))
+		writeQuest(w, e.q, e.def, e.event, e.q.Index, e.category, questsEnd(d))
 	}
 	// the pools' state (+0x0 event, +0x10 handed out, +0x20 the taken
 	// indices; encoder 0x31b864): a reroll (0x785fac) takes one back and
@@ -410,7 +382,54 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 	} else {
 		w.VInt(0)
 	}
-	vints(w, 3) // the other lists
+	// the chains' state (+0x40 a LogicLong per chain: its event id, ours
+	// the step; +0x50 the chain's current quest or none; encoder 0x31b91c,
+	// decoder 0x4bd2d8). The quest screen shows a chain's quest from here
+	// (0x7a3250 looks the chain's event up by the key's id), not from the
+	// active list: mini quests there showed in the quest button's count
+	// but not on the screen.
+	chain := miniChain()
+	var open []Quest
+	for _, q := range s.mini {
+		if miniQuestsOn && !q.Claimed && int(q.Index) < len(chain) {
+			open = append(open, q)
+		}
+	}
+	w.VInt(int32(len(open)))
+	for _, q := range open {
+		mini, step := miniOfQuest(q)
+		w.Int(miniChainEvent(mini))
+		w.Int(step)
+		w.Bool(true)
+		writeQuest(w, q, chain[q.Index], miniChainEvent(mini), step, questCategoryMini, questsEnd(d))
+	}
+	vints(w, 2) // the other lists (+0xa0, ...)
+}
+
+// writeQuest writes one quest (decoder 0x3b3af4, the short form).
+func writeQuest(w *proto.Writer, q Quest, def questDef, event, index, category, end int32) {
+	w.VInt(event)
+	w.VInt(index)
+	w.VInt(def.TypeID)
+	// the kind's state (0x506b4c makes it by kind; its vtable+0x18
+	// writes it): MetaUpgrade two bools (0xea0478), WinRumble nothing
+	// (0xeb3fe0), PlayGameMode the mode, 2_PLAYER 2 / RUMBLE 3
+	// (0xec3568, 0x86517c)
+	w.Bool(true)
+	def.encodeState(w)
+	w.String(def.Text)
+	w.VInt(q.ID)
+	w.VInt(q.Progress)
+	w.VInt(def.Target)
+	w.VInt(0) // +0x30
+	w.VInt(category)
+	intList(w, def.Rewards)
+	w.String("") // +0x58
+	w.VInt(0)    // +0x18
+	// +0x1c: the end time (unix seconds, as the events'). A battle copies
+	// only the quests not yet ended (0x4f6854: +0x1c > now), and the quest
+	// screen lists only those (0x753e88); with 0 both had none.
+	w.VInt(end)
 }
 
 // QuestSummary: today's quests for the log ("" without live content).
@@ -430,6 +449,13 @@ func (a *Account) QuestSummary() string {
 			st = " claimed"
 		}
 		l = append(l, fmt.Sprintf("#%d %s %d/%d%s", q.ID, d.Kind, q.Progress, d.Target, st))
+	}
+	chain := miniChain()
+	for _, q := range a.MiniQuests {
+		if !q.Claimed && int(q.Index) < len(chain) {
+			mini, _ := miniOfQuest(q)
+			l = append(l, fmt.Sprintf("mini #%d %s %d/%d", q.ID, Data.CharName(miniCharRows[mini]), q.Progress, chain[q.Index].Target))
+		}
 	}
 	return strings.Join(l, ", ")
 }

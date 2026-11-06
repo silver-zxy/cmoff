@@ -22,8 +22,14 @@ import (
 // the screen did not list. With the end time they are on again.
 var miniQuestsOn = true
 
-// miniChainEvent: the chronos event of the mini quest chain.
-const miniChainEvent int32 = 1002
+// miniChainEvent: the chronos event of a mini's quest chain, one per mini
+// (a chain shows one quest at a time; three minis, three chains).
+func miniChainEvent(mini int) int32 { return 1100 + int32(mini) }
+
+// miniOfQuest: a mini quest's mini (index into miniCharRows) and step.
+func miniOfQuest(q Quest) (int, int32) {
+	return int(q.Index) / len(miniQuestWins), q.Index % int32(len(miniQuestWins))
+}
 
 // miniQuestsShown: mini quests in the list at a time.
 const miniQuestsShown = 3
@@ -50,9 +56,11 @@ func miniChain() []questDef {
 	return out
 }
 
-func miniChainLiveEvent() LiveEvent {
+// miniChainLiveEvent: the QUEST_CHAIN event of one mini: win 1, 3, 5.
+func miniChainLiveEvent(mini int) LiveEvent {
+	chain := miniChain()
 	var list []any
-	for _, q := range miniChain() {
+	for _, q := range chain[mini*len(miniQuestWins) : (mini+1)*len(miniQuestWins)] {
 		list = append(list, q.json())
 	}
 	b, _ := json.Marshal(map[string]any{
@@ -67,10 +75,25 @@ func miniChainLiveEvent() LiveEvent {
 	start := int32(day.AddDate(0, 0, -1).Unix())
 	end := int32(day.AddDate(0, 0, 30).Unix())
 	return LiveEvent{
-		ID: miniChainEvent, Name: "mini_quests", Type: EventQuestChain,
-		Start: start, End: end, VisibleStart: start, VisibleEnd: end,
+		ID: miniChainEvent(mini), Name: "mini_quests_" + Data.CharName(miniCharRows[mini]),
+		Type: EventQuestChain, Start: start, End: end, VisibleStart: start, VisibleEnd: end,
 		Parameters: string(b),
 	}
+}
+
+// miniChainEvents: the chain events of the minis with an open quest.
+func (a *Account) miniChainEvents() []LiveEvent {
+	var out []LiveEvent
+	if !miniQuestsOn || len(miniChain()) == 0 {
+		return nil
+	}
+	for _, q := range a.MiniQuests {
+		if !q.Claimed {
+			mini, _ := miniOfQuest(q)
+			out = append(out, miniChainLiveEvent(mini))
+		}
+	}
+	return out
 }
 
 // refreshMiniQuests hands out the next step of owned minis until three are

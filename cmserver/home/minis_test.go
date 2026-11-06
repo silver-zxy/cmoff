@@ -52,28 +52,43 @@ func TestMiniQuests(t *testing.T) {
 	if !found || len(a.MiniQuests) != miniQuestsShown {
 		t.Fatalf("next step %+v", a.MiniQuests)
 	}
-	// the home: dailies and mini quests decode; the chain event is there
+	// the home: the dailies in the active list, the mini quests in the
+	// chains' state (event, step, quest), one chain event per open mini
 	h := a.ownHome()
 	h.home.skinStore = false
 	m, err := decode(h.encode())
-	if err != nil || len(m.home.quests.quests) != questsPerDay+miniQuestsShown {
-		t.Fatalf("%v %d quests", err, len(m.home.quests.quests))
+	if err != nil || len(m.home.quests.quests) != questsPerDay || len(lastChains) != miniQuestsShown {
+		t.Fatalf("%v %d quests, chains %+v", err, len(m.home.quests.quests), lastChains)
 	}
-	var chainEv *LiveEvent
-	for i := range m.home.events {
-		if m.home.events[i].Type == EventQuestChain {
-			chainEv = &m.home.events[i]
+	events := map[int32]LiveEvent{}
+	for _, e := range m.home.events {
+		if e.Type == EventQuestChain {
+			events[e.ID] = e
 		}
 	}
-	if chainEv == nil {
-		t.Fatal("no chain event")
+	for _, c := range lastChains {
+		// the decoded quest's index is its index in the chain: the step
+		var q Quest
+		for _, mq := range a.MiniQuests {
+			if mq.ID == c.quest.ID {
+				q = mq
+			}
+		}
+		mini, step := miniOfQuest(q)
+		e, ok := events[c.event]
+		if !ok || q.ID == 0 || c.event != miniChainEvent(mini) || c.step != step || c.quest.Index != step {
+			t.Fatalf("chain %+v (mini %d step %d) events %v", c, mini, step, len(events))
+		}
+		var p struct {
+			Chain    []map[string]any
+			Category string
+		}
+		if err := json.Unmarshal([]byte(e.Parameters), &p); err != nil || len(p.Chain) != 3 || p.Category != "Tutorial" ||
+			p.Chain[0]["RequirementMini"] != Data.CharName(miniCharRows[mini]) {
+			t.Fatalf("%v %s", err, e.Parameters)
+		}
 	}
-	var p struct {
-		Chain    []map[string]any
-		Category string
-	}
-	if err := json.Unmarshal([]byte(chainEv.Parameters), &p); err != nil || len(p.Chain) != 3*len(miniCharRows) || p.Category != "Tutorial" ||
-		p.Chain[0]["RequirementMini"] != "Mini0B1" {
-		t.Fatalf("%v %s", err, chainEv.Parameters[:200])
+	if len(events) != miniQuestsShown {
+		t.Fatalf("%d chain events", len(events))
 	}
 }

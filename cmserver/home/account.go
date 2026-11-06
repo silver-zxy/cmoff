@@ -285,6 +285,7 @@ func (a *Account) ownHome() ownHomeData {
 	if Live {
 		a.refreshQuests()
 		a.refreshMiniQuests()
+		h.events = append(h.events, a.miniChainEvents()...)
 		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken(), mini: a.MiniQuests}
 		// the server time, unix seconds: the tail's second VInt (msg +0x9c,
 		// 0x48b2e4) becomes the logic's time base (+0x1d4 via 0x85f100,

@@ -351,6 +351,39 @@ func decodeSeason(r *proto.Reader) *SeasonState {
 	return out
 }
 
+func decodeQuest(r *proto.Reader) Quest {
+	var q Quest
+	r.VInt() // event
+	q.Index = r.VInt()
+	kind := r.VInt()
+	if r.Bool() {
+		switch kind {
+		case questMetaUpgrade:
+			r.Bool()
+			r.Bool()
+		case questPlayGameMode, questPlayWithUnit, questResourceGained,
+			questUpgradeUnit, questTotalKOs, questKeywordClash, questEndRoundAlive:
+			r.VInt()
+		case questWinWithUnit:
+			r.Bool()
+			r.VInt()
+		}
+	}
+	_ = r.String()
+	q.ID = r.VInt()
+	q.Progress = r.VInt()
+	r.VInt()
+	r.VInt()
+	r.VInt()
+	for k := r.VInt(); k > 0; k-- {
+		r.VInt()
+	}
+	_ = r.String()
+	r.VInt()
+	r.VInt()
+	return q
+}
+
 // lastPoolState: the pool state decodeQuests read last (event, handed
 // out, taken indices...).
 var lastPoolState []int32
@@ -364,36 +397,7 @@ func decodeQuests(r *proto.Reader) []Quest {
 	}
 	var out []Quest
 	for n := r.VInt(); n > 0 && r.Err() == nil; n-- {
-		var q Quest
-		r.VInt() // event
-		q.Index = r.VInt()
-		kind := r.VInt()
-		if r.Bool() {
-			switch kind {
-			case questMetaUpgrade:
-				r.Bool()
-				r.Bool()
-			case questPlayGameMode, questPlayWithUnit, questResourceGained,
-				questUpgradeUnit, questTotalKOs, questKeywordClash, questEndRoundAlive:
-				r.VInt()
-			case questWinWithUnit:
-				r.Bool()
-				r.VInt()
-			}
-		}
-		_ = r.String()
-		q.ID = r.VInt()
-		q.Progress = r.VInt()
-		r.VInt()
-		r.VInt()
-		r.VInt()
-		for k := r.VInt(); k > 0; k-- {
-			r.VInt()
-		}
-		_ = r.String()
-		r.VInt()
-		r.VInt()
-		out = append(out, q)
+		out = append(out, decodeQuest(r))
 	}
 	// pool state: event, handed out, taken indices
 	lastPoolState = nil
@@ -403,11 +407,29 @@ func decodeQuests(r *proto.Reader) []Quest {
 			lastPoolState = append(lastPoolState, r.VInt())
 		}
 	}
-	for i := 0; i < 3; i++ {
+	// the chains' state: key (event, step), the current quest
+	lastChains = nil
+	for n := r.VInt(); n > 0 && r.Err() == nil; n-- {
+		ev, step := r.Int(), r.Int()
+		var q Quest
+		if r.Bool() {
+			q = decodeQuest(r)
+		}
+		lastChains = append(lastChains, chainState{ev, step, q})
+	}
+	for i := 0; i < 2; i++ {
 		r.VInt()
 	}
 	return out
 }
+
+type chainState struct {
+	event, step int32
+	quest       Quest
+}
+
+// lastChains: the chains decodeQuests read last.
+var lastChains []chainState
 
 // decodeEvents mirrors EncodeEvents (0x295f9c, 0x4915fc).
 func decodeEvents(r *proto.Reader) []LiveEvent {

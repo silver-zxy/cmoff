@@ -302,15 +302,14 @@ Fifth test: still the old quest again, without rewards. Two causes:
   Competitive 5). For every owned mini: win 1, 3 and 5 matches using it,
   one after the other (digistatement), reward quest_Daily_Mini (1 Pony
   Fuel and a mini fragment, as on the screenshots).
-- Ours: one QUEST_CHAIN event (1002, Category Tutorial) with the three
-  quests of each of the client's 22 minis (WinWithUnit with
-  RequirementMini, TID_CHRONOS_QUESTS_WINWITHUNITSPECIFIC); the home
-  hands out the next step of three owned minis at a time, the selected
-  deck's first. A won match counts for the deck's minis on the server; the
-  client's own count comes with the hook's report.
-- The kinds' keys also go at the quest's top level in the JSON (besides
-  the object named like the kind): the "Win N Trophies" crash suggests the
-  readers may take them from there.
+- Ours: one QUEST_CHAIN event per mini with an open quest (1100 + the
+  mini's index; Chain: win 1, 3, 5 with it; Category Tutorial). A chain's
+  quest goes in the quest manager's chains' state, not the active list:
+  per chain a LogicLong (event id, ours the step) and a Bool + the quest
+  (+0x40 / +0x50; encoder 0x31b91c, decoder 0x4bd2d8). The client looks
+  each chain's event up by the key's id (0x7a3250) and the quest screen
+  shows the chain's quest. In the active list (0077, 0080) the quest
+  button counted them but the screen did not show them (0081).
 
 ## Boards (`home/boards.go`)
 

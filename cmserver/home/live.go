@@ -301,8 +301,5 @@ func LiveEvents() []LiveEvent {
 		Start: start, End: end, VisibleStart: start, VisibleEnd: end,
 		Parameters: string(b),
 	}, seasonLiveEvent(), shopLiveEvent()}
-	if miniQuestsOn && len(miniChain()) > 0 {
-		events = append(events, miniChainLiveEvent())
-	}
 	return events
 }
