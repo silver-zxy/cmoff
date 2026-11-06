@@ -41,7 +41,12 @@ var (
 var (
 	starterMinis       = []int32{0, 1, 4, 5, 6} // seasonal rows
 	starterHero  int32 = 12                     // support_heroes row
-	starterGold  int32 = 100
+	// globals.csv STARTING_GOLD and STARTING_DIAMONDS
+	starterGold int32 = 500
+	starterGems int32 = 100
+	// what the server gave before it followed globals.csv (0055): the
+	// difference is caught up once (CatchUp)
+	oldStarterGold int32 = 100
 )
 
 func miniID(seasonalRow int32) int32 { return globalID(classSEASONAL, seasonalRow) }
@@ -134,7 +139,9 @@ func (a *Account) StartProgression() {
 	a.Selected = 0
 	a.Gold = starterGold
 	a.Chests, a.LevelChests = nil, nil
-	a.Trophies, a.BestTrophies, a.Exp, a.Gems = 0, 0, 0, 0
+	a.Trophies, a.BestTrophies, a.Exp = 0, 0, 0
+	a.Gems = starterGems
+	a.StarterChests = false
 	a.Stats = Stats{}
 }
 
@@ -227,6 +234,10 @@ type Reward struct {
 	Upgraded  []int32 // collectibles one level up (by the client itself)
 	Fragments map[int32]int32
 	Chests    []int32 // chests put into the home to be opened
+	// SeasonPoints: Pony Fuel for the Adventure Road (season.go)
+	SeasonPoints int32
+	// CrystalCoins: PromotionToken
+	CrystalCoins int32
 	// GoldCapped: today's battle gold limit was reached.
 	GoldCapped bool
 }
@@ -238,6 +249,12 @@ func (r *Reward) String() string {
 	}
 	if r.Gems > 0 {
 		s += fmt.Sprintf(", %d gems", r.Gems)
+	}
+	if r.CrystalCoins > 0 {
+		s += fmt.Sprintf(", %d crystal coins", r.CrystalCoins)
+	}
+	if r.SeasonPoints > 0 {
+		s += fmt.Sprintf(", %d pony fuel", r.SeasonPoints)
 	}
 	if r.Exp > 0 {
 		s += fmt.Sprintf(", %d exp", r.Exp)
@@ -331,25 +348,15 @@ func (a *Account) battleRewards(rng *rand.Rand, r *Reward, mode, place int32, le
 	a.queueChest(r, winChest, ChestContent{Fragments: frag})
 }
 
-// BotLevels: the hero and mini level the bots get, the same as the player's
-// selected deck (fair fights).
+// BotLevels: the hero and mini level the hook gives every bot deck. With
+// progression the bots keep their decks' own levels (bot_decks.csv, by
+// league, as in the original): 0, 0. With the unlocked collection (no
+// progression) the player is maxed, so are the bots.
 func (a *Account) BotLevels() (hero, mini int32) {
 	if !a.Progression {
 		return maxHeroLevel, maxMiniLevel
 	}
-	hero = a.Level(heroID(a.Heroes[a.Selected]))
-	var sum, n int32
-	for _, r := range a.Decks[a.Selected] {
-		if r >= 0 {
-			sum += a.Level(miniID(r))
-			n++
-		}
-	}
-	mini = 1
-	if n > 0 {
-		mini = (sum + n/2) / n
-	}
-	return max(hero, 1), max(mini, 1)
+	return 0, 0
 }
 
 // fillCollection writes the earned collection into the home: owned minis
@@ -383,8 +390,31 @@ func (a *Account) fillCollection(m *ownHomeData) {
 	}
 	m.avatar.slots[2] = nil
 	m.avatar.slots[0] = []dataSlot{{class: classRESOURCES, instance: resourceGold, count: a.Gold}}
+	if a.CrystalCoins > 0 {
+		m.avatar.slots[0] = append(m.avatar.slots[0], dataSlot{class: classRESOURCES, instance: resourcePromotionToken, count: a.CrystalCoins})
+	}
 }
 
 // resourceGold: resources.csv row "Gold"; the HUD shows its count from the
 // avatar's first data slot list (0x598d98).
 const resourceGold int32 = 1
+
+// resourcePromotionToken: resources.csv row "PromotionToken", the Crystal
+// Coins (at most 9999).
+const (
+	resourcePromotionToken int32 = 13
+	maxCrystalCoins        int32 = 9999
+)
+
+// addCrystalCoins: Crystal Coins from a chest (Clashmas quests, the season
+// end), up to the cap.
+func (a *Account) addCrystalCoins(r *Reward, n int32) {
+	n = min(n, maxCrystalCoins-a.CrystalCoins)
+	if n <= 0 {
+		return
+	}
+	a.CrystalCoins += n
+	if r != nil {
+		r.CrystalCoins += n
+	}
+}

@@ -19,8 +19,8 @@ func TestProgressionStartAndUpgrade(t *testing.T) {
 	if a.Level(miniID(0)) != 1 || a.Level(miniID(3)) != 0 || a.Level(heroID(12)) != 1 || a.Level(heroID(11)) != 0 {
 		t.Fatal("starter collection wrong")
 	}
-	if h, m := a.BotLevels(); h != 1 || m != 1 {
-		t.Fatalf("bot levels %d %d", h, m)
+	if h, m := a.BotLevels(); h != 0 || m != 0 {
+		t.Fatalf("bot levels %d %d, want the decks' own (0 0)", h, m)
 	}
 
 	// Mini: unlock needs 1 fragment, no gold.
@@ -36,7 +36,7 @@ func TestProgressionStartAndUpgrade(t *testing.T) {
 	}
 	// Hero 1 -> 2: 10 fragments and 100 gold.
 	a.entry(heroID(12)).Fragments = 10
-	if err := a.upgradeErr(heroID(12), 1); err != nil || a.Gold != 0 || a.Level(heroID(12)) != 2 {
+	if err := a.upgradeErr(heroID(12), 1); err != nil || a.Gold != starterGold-100 || a.Level(heroID(12)) != 2 {
 		t.Fatalf("hero upgrade: %v gold %d", err, a.Gold)
 	}
 
@@ -138,7 +138,7 @@ func TestUpgradeExpAndLevelChest(t *testing.T) {
 	}
 	all := openAll()
 	if l, _ := ExpLevel(a.Exp); l != 2 || all.Exp != 5 || len(all.LevelUps) != 1 ||
-		a.Gems != 10 || a.Gold != starterGold+100 {
+		a.Gems != starterGems+10 || a.Gold != starterGold+100 {
 		t.Fatalf("level %d %+v gems %d gold %d", l, all, a.Gems, a.Gold)
 	}
 	// the unlock gives no exp
@@ -291,27 +291,37 @@ func TestChestAutoUpgrade(t *testing.T) {
 		t.Fatalf("%s; pushes %+v", r, p)
 	}
 	a.OpenPending(3)
-	if a.Gold != gold+100 || a.Gems != 10 || len(a.Chests) != 0 || a.ChestIndex != 3 {
+	if a.Gold != gold+100 || a.Gems != starterGems+10 || len(a.Chests) != 0 || a.ChestIndex != 3 {
 		t.Fatalf("gold %d gems %d chests %+v", a.Gold, a.Gems, a.Chests)
 	}
 }
 
-// Daily quests: handed out per day, counted by battles and upgrades, the
-// claim pushes the reward chest the client makes (source 2, the quest id).
+// Daily quests: six a day, three at a time, counted by battles, trophies
+// and the road; the claim pushes the reward chest the client makes (source
+// 2, the quest id) and makes room for the next; one reroll takes the pool's
+// last quest.
 func TestDailyQuests(t *testing.T) {
+	catalog := questCatalog
+	defer func() { questCatalog = catalog }()
+	win := questDef{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINWITHUNIT", 2, rewardSmall, map[string]any{"UseRoundWins": false}}
+	trophies := questDef{"MetaResourceGained", questResourceGained, "TID_CHRONOS_QUESTS_WINTROPHIES", 10, rewardBig, map[string]any{"Resource": "RankPoints"}}
+	questCatalog = []questDef{playDuels(3, rewardSmall), catalog[7], win, trophies,
+		{"MetaSeasonRoadLevel", questSeasonRoadLevel, "TID_CHRONOS_QUESTS_SEASONPASSLEVELUP", 2, rewardSmall, nil},
+		playRumbles(2, rewardSmall),
+		{"PlayWithUnit", questPlayWithUnit, "TID_CHRONOS_QUESTS_PLAYWITHUNIT", 4, rewardSmall, map[string]any{}}}
 	day := time.Date(2026, 11, 4, 12, 0, 0, 0, time.Local)
 	now = func() time.Time { return day }
 	defer func() { now = time.Now }()
 	a := NewAccount()
 	a.StartProgression()
 	a.refreshQuests()
-	if len(a.Quests) != 3 {
+	if len(a.Quests) != 3 || a.Quests[0].Index != 0 || a.Quests[2].Index != 2 {
 		t.Fatalf("quests %+v", a.Quests)
 	}
 	for i := 0; i < 3; i++ {
 		a.BattleResult(ModeDuel, 2, false) // played, lost: counts for PlayGameMode
 	}
-	a.BattleResult(ModeRumble, 2, false) // not the champion
+	a.BattleResult(ModeRumble, 2, false) // not the champion, but won (top 4)
 	a.BattleResult(ModeRumble, 1, false)
 	if a.Quests[0].Progress != 3 || a.Quests[1].Progress != 1 || a.Quests[2].Progress != 2 {
 		t.Fatalf("progress %+v", a.Quests)
@@ -320,13 +330,20 @@ func TestDailyQuests(t *testing.T) {
 	if a.ClaimQuest(&Reward{}, a.Quests[2].ID) {
 		t.Fatal("claimed an unfinished quest")
 	}
-	// reroll: the pool's fourth quest, a new id; only once a day
-	old := a.Quests[2].ID
-	if _, _, ok := a.RerollQuest(old); !ok || a.Quests[2].Index != 3 || a.Quests[2].ID != a.QuestID || a.Quests[2].Progress != 0 {
+	// the home lists every index but the reroll's as taken
+	if fmt.Sprint(a.questPoolTaken()) != "[0 1 2 3 4 5]" {
+		t.Fatalf("taken %v", a.questPoolTaken())
+	}
+	// reroll: the pool's last quest, a new id; only once a day
+	old := a.Quests[2]
+	if _, _, ok := a.RerollQuest(old.ID); !ok || a.Quests[2].Index != questRerollIndex || a.Quests[2].ID != a.QuestID || a.Quests[2].Progress != 0 {
 		t.Fatalf("reroll %+v", a.Quests)
 	}
 	if _, _, ok := a.RerollQuest(a.Quests[1].ID); ok {
 		t.Fatal("second reroll")
+	}
+	if fmt.Sprint(a.questPoolTaken()) != "[0 1 3 4 5 6]" {
+		t.Fatalf("taken after the reroll %v", a.questPoolTaken())
 	}
 	a.TakePushes()
 	r := &Reward{}
@@ -340,28 +357,55 @@ func TestDailyQuests(t *testing.T) {
 	if a.ClaimQuest(r, a.Quests[0].ID) {
 		t.Fatal("claimed twice")
 	}
-	// the home: two active quests left; the pool state lists all three
-	// taken indices (incl. the rerolled one's new and the claimed one)
+	// the claimed one made room: the next index (3, trophies), not the
+	// rerolled-away 2
+	if len(a.Quests) != 4 || a.Quests[3].Index != 3 {
+		t.Fatalf("next quest %+v", a.Quests)
+	}
+	a.Trophies = 100
+	a.BattleResult(ModeDuel, 1, true)
+	if a.Quests[3].Progress == 0 {
+		t.Fatalf("trophies not counted %+v", a.Quests[3])
+	}
+	// the home: three open quests; the pool state as questPoolTaken
 	h := a.ownHome()
 	h.home.skinStore = false
 	m, err := decode(h.encode())
-	if err != nil || len(m.home.quests.quests) != 2 || len(m.home.events) != 1 || m.home.events[0].Type != EventQuestPool {
+	if err != nil || len(m.home.quests.quests) != 3 || len(m.home.events) != 3 || m.home.events[0].Type != EventQuestPool || m.home.events[1].Type != EventSeasonData || m.home.events[2].Type != EventShopLayout {
 		t.Fatalf("%v quests %+v events %d", err, m.home.quests.quests, len(m.home.events))
 	}
-	if fmt.Sprint(lastPoolState) != fmt.Sprint([]int32{dailyPoolEvent, 3, 0, 1, 3}) {
+	if fmt.Sprint(lastPoolState) != fmt.Sprint([]int32{dailyPoolEvent, 4, 0, 1, 3, 4, 5, 6}) {
 		t.Fatalf("pool state %v", lastPoolState)
 	}
+	// six a day at most
+	for i := 0; i < 10; i++ {
+		for j := range a.Quests {
+			q := &a.Quests[j]
+			if !q.Claimed {
+				q.Progress = 99
+				a.ClaimQuest(r, q.ID)
+				break
+			}
+		}
+	}
+	if len(a.Quests) != questsPerDay {
+		t.Fatalf("%d quests today", len(a.Quests))
+	}
+	for _, q := range a.Quests {
+		if !q.Claimed {
+			t.Fatalf("not all claimed %+v", a.Quests)
+		}
+	}
 	// a changed pool: the saved quests point into it by index, new ones
-	saved := a.Quests[1].ID
 	a.QuestPool = "an older pool"
 	a.refreshQuests()
-	if a.Quests[1].ID <= saved || a.Quests[1].Progress != 0 || a.QuestPool != questPoolSignature() {
+	if len(a.Quests) != 3 || a.Quests[0].Claimed || a.QuestPool != questPoolSignature() {
 		t.Fatalf("pool changed %+v", a.Quests)
 	}
 	// next day: new quests
 	day = day.AddDate(0, 0, 1)
 	a.refreshQuests()
-	if a.Quests[0].Claimed || a.Quests[0].Progress != 0 || a.Quests[0].ID <= 3 {
+	if a.Quests[0].Claimed || a.Quests[0].Progress != 0 || a.QuestRerolls != 0 {
 		t.Fatalf("next day %+v", a.Quests)
 	}
 }

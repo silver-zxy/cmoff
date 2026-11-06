@@ -66,13 +66,16 @@ config in the signal the hook picks one at random from `BOT_CONFIGS`
 - `table+0x10` = columns, `column+0x18` = int cells (0x535e08 → 0x72c69c → 0x817a60)
 - column index of BotConfigIndex: global libg+0xf57740 (loader 0x8c2b44)
 
-**Fair levels.** Bot decks carry their own levels (Silver/Gold pools: heroes
-3–5, minis 1–3). Before each battle the hook sets every bot deck to the
-player's levels from the signal (hero of the selected deck, average deck mini
-level); without them to `BOT_HERO_LEVEL` (10) and `BOT_MINI_LEVEL` (4), the
-unlocked collection. The bot_decks table (class 133) is `*(libg+0x1080b70)`;
-its deck objects cache the levels at load (constructor 0x5b49ac): hero level
-+0x40, mini levels int list +0x58 with count +0x64.
+**Bot levels as in the original.** Bot decks carry their own levels by
+league (Bronze: heroes 1–4, minis 1–2; Diamond 6–7; Grandmaster and the FF
+decks 10 and 4). With progression the server sends 0 and the decks keep them.
+With the unlocked collection (the player maxed) it sends 10 and 4 and the
+hook sets every deck to them; it saves the decks' own levels first and puts
+them back when a later signal says 0. The bot_decks table (class 133) is
+`*(libg+0x1080b70)`; its deck objects cache the levels at load (constructor
+0x5b49ac): hero level +0x40, mini levels int list +0x58 with count +0x64.
+The generated decks (`BOT_DECK_NORMAL` / `NEWBIE` / `RANDOM`, built from the
+player's collection) are not in the table and not touched.
 
 The npc's `Seed` is never read (getSeed 0x8344dc has no callers); the battle
 seeds `srand` from `clock_gettime` itself. Build with e.g.
@@ -154,6 +157,20 @@ switched it on), so it is false. The hook keeps it set: `LogicGlobals* =
 *(libg+0x1080760)` (getter 0x933020). The cost table `NAME_CHANGE_GEM_COST`
 is `[0]`, and the server always sends 0 name changes, so renaming is free.
 
+## Help and Support
+
+The settings button (settings popup +0x140, click 0x7338a0) opens the
+Helpshift chat only with a Helpshift manager (`*(libg+0x1097628)`, global
+`HELPSHIFT_ENABLED` LogicGlobals +0x268, which only the live server set).
+Without it (0x733a1c) it opens the in-game web view (0x4bc340, "Loading url
+%s", the URL plus `?time=<seconds>`) at the locale's help URL (0x48be78 →
+`csv_client/locales.csv`, columns HelpshiftURL / SelfhelpURL). The build
+(`patch_apk.py --help-page`) puts our page there, `cmoffline/help/help.html`
+as a `data:` URL: no network, no cleartext HTTP (blocked for targetSdk 30);
+the page ends in an open comment, so the appended `?time=…` stays hidden.
+The table's fingerprint.json entry gets the new SHA-1. "Close" links to
+`selfhelp://close`.
+
 ## Crash logger
 
 Unless built with `-DCMOFFLINE_NO_CRASH_LOGGER`, SIGSEGV/SIGBUS/SIGABRT are
@@ -170,7 +187,6 @@ logged with `pc`, `lr` and the frame chain as Ghidra addresses, then passed on.
 | `CMOFFLINE_NO_CRASH_LOGGER` | no signal handlers |
 | `REDIRECT_TO="…"` | another server address |
 | `BOT_CONFIGS=5,6,…` | bot configs picked at random when the server sends none (default 5–10) |
-| `BOT_HERO_LEVEL=n`, `BOT_MINI_LEVEL=n` | bot deck levels when the server sends none (default 10 and 4) |
 | `CMSERVER_OPTIONS="progression=fresh"` | options for the in-game server (build.sh `PROGRESSION=`) |
 
 ## Offsets (1.1143.2)

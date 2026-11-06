@@ -33,7 +33,7 @@ import (
 // Quest is one daily quest of the account.
 type Quest struct {
 	ID       int32 `json:"id"`
-	Index    int32 `json:"index"` // in dailyQuests
+	Index    int32 `json:"index"` // in todaysQuests
 	Progress int32 `json:"progress"`
 	Claimed  bool  `json:"claimed,omitempty"`
 }
@@ -43,32 +43,99 @@ const (
 	sourceQuest        int32 = 2
 )
 
-// dailyQuestsFor: today's quests, new ones when the day changed.
+// refreshQuests: today's quests, new ones when the day changed, and the
+// next ones while fewer than three are open.
 func (a *Account) refreshQuests() {
 	if !Live {
 		return
 	}
 	day := now().Format("2006-01-02")
 	pool := questPoolSignature()
-	if a.QuestDay == day && a.QuestPool == pool && len(a.Quests) > 0 {
-		return
+	if a.QuestDay != day || a.QuestPool != pool {
+		// a changed pool makes new quests too: the saved ones point into
+		// it by index
+		a.QuestDay = day
+		a.QuestPool = pool
+		a.QuestRerolls = 0
+		a.QuestDropped = nil
+		a.Quests = a.Quests[:0]
 	}
-	// a changed pool makes new quests too: the saved ones point into it
-	// by index
-	a.QuestDay = day
-	a.QuestPool = pool
-	a.QuestRerolls = 0
-	a.Quests = a.Quests[:0]
-	for i := 0; i < questsPerDay; i++ {
+	a.topUpQuests()
+}
+
+// questRerollIndex: the pool index kept for the reroll (the pool's last).
+const questRerollIndex = questPoolSize - 1
+
+// topUpQuests hands out the pool's next quests while fewer than three are
+// open and fewer than six were handed out today. The next is the lowest
+// index not handed out, not rerolled away, and not the reroll's.
+func (a *Account) topUpQuests() {
+	for {
+		open := 0
+		for _, q := range a.Quests {
+			if !q.Claimed {
+				open++
+			}
+		}
+		if open >= questsConcurrent || len(a.Quests) >= questsPerDay {
+			return
+		}
+		next := a.nextQuestIndex()
+		if next < 0 {
+			return
+		}
 		a.QuestID++
-		a.Quests = append(a.Quests, Quest{ID: a.QuestID, Index: int32(i)})
+		a.Quests = append(a.Quests, Quest{ID: a.QuestID, Index: next})
 	}
+}
+
+func (a *Account) nextQuestIndex() int32 {
+	taken := a.questIndicesTaken()
+	for i := int32(0); i < questPoolSize; i++ {
+		if !taken[i] && i != questRerollIndex {
+			return i
+		}
+	}
+	return -1
+}
+
+// questIndicesTaken: the pool indices handed out today or rerolled away.
+func (a *Account) questIndicesTaken() map[int32]bool {
+	taken := map[int32]bool{}
+	for _, q := range a.Quests {
+		taken[q.Index] = true
+	}
+	for _, i := range a.QuestDropped {
+		taken[i] = true
+	}
+	return taken
+}
+
+// questPoolTaken: the taken indices the home tells the client. Its reroll
+// (0x785fac) picks at random among the indices not listed, so every index
+// but the reroll's is listed, the ones still to come included; after the
+// reroll only the one rerolled away is free (the client frees it itself).
+func (a *Account) questPoolTaken() []int32 {
+	var out []int32
+	for i := int32(0); i < questPoolSize; i++ {
+		if a.QuestRerolls < questRerollsPerDay && i == questRerollIndex {
+			continue
+		}
+		dropped := false
+		for _, d := range a.QuestDropped {
+			dropped = dropped || d == i
+		}
+		if !dropped {
+			out = append(out, i)
+		}
+	}
+	return out
 }
 
 // questPoolSignature names the pool's quests, to see when it changed.
 func questPoolSignature() string {
 	var b strings.Builder
-	for _, d := range dailyQuests {
+	for _, d := range todaysQuests() {
 		gm, _ := d.Own["GameMode"].(string)
 		fmt.Fprintf(&b, "%s/%s/%d/%v;", d.Kind, gm, d.Target, d.Rewards)
 	}
@@ -76,32 +143,26 @@ func questPoolSignature() string {
 }
 
 // RerollQuest is LogicRerollQuestCommand 502 (base, VInt quest id): the
-// client replaces the quest by an unused one of the pool itself; with one
-// left over that is the pool's last quest. The new quest takes the next id
-// (+0xb0 counts them).
+// client replaces the quest by an unused one of the pool itself; the home
+// leaves only the reroll's index free, so that is its pick. The new quest
+// takes the next id (+0xb0 counts them).
 func (a *Account) RerollQuest(id int32) (from, to string, ok bool) {
 	a.refreshQuests()
-	used := map[int32]bool{}
-	for _, q := range a.Quests {
-		used[q.Index] = true
-	}
-	free := int32(-1)
-	for i := range dailyQuests {
-		if !used[int32(i)] {
-			free = int32(i)
-			break
-		}
+	pool := todaysQuests()
+	if a.QuestRerolls >= questRerollsPerDay || a.questIndicesTaken()[questRerollIndex] {
+		return "", "", false
 	}
 	for i := range a.Quests {
 		q := &a.Quests[i]
-		if q.ID != id || q.Claimed || free < 0 || a.QuestRerolls >= questRerollsPerDay {
+		if q.ID != id || q.Claimed {
 			continue
 		}
-		from = dailyQuests[q.Index].Text
+		from = pool[q.Index].Text
+		a.QuestDropped = append(a.QuestDropped, q.Index)
 		a.QuestID++
-		*q = Quest{ID: a.QuestID, Index: free}
+		*q = Quest{ID: a.QuestID, Index: questRerollIndex}
 		a.QuestRerolls++
-		return from, dailyQuests[free].Text, true
+		return from, pool[questRerollIndex].Text, true
 	}
 	return "", "", false
 }
@@ -113,9 +174,10 @@ const questRerollsPerDay = 1
 // quest counts it.
 func (a *Account) questProgress(kind int32, n int32, match func(questDef) bool) {
 	a.refreshQuests()
+	pool := todaysQuests()
 	for i := range a.Quests {
 		q := &a.Quests[i]
-		d := dailyQuests[q.Index]
+		d := pool[q.Index]
 		if q.Claimed || d.TypeID != kind || q.Progress >= d.Target || (match != nil && !match(d)) {
 			continue
 		}
@@ -123,23 +185,47 @@ func (a *Account) questProgress(kind int32, n int32, match func(questDef) bool) 
 	}
 }
 
-// questsAfterBattle: a finished battle counts for PlayGameMode and, won,
-// for WinRumble.
+// questsAfterBattle: a finished battle counts for PlayGameMode and
+// PlayWithUnit, won for WinWithUnit (a duel won, a Rumble in the top 4)
+// and, first in a Rumble, WinRumble.
 func (a *Account) questsAfterBattle(mode, place int32) {
 	a.questProgress(questPlayGameMode, 1, func(d questDef) bool {
 		gm, _ := d.Own["GameMode"].(string)
 		return (gm == "2_PLAYER" && mode == ModeDuel) || (gm == "RUMBLE" && mode == ModeRumble)
 	})
+	a.questProgress(questPlayWithUnit, 1, nil)
+	if won(mode, place) {
+		a.questProgress(questWinWithUnit, 1, nil)
+	}
 	if mode == ModeRumble && place == 1 { // "Finish as the Champion"
 		a.questProgress(questWinRumble, 1, nil)
 	}
 }
 
+// questsTrophies: trophies won count for "Win N Trophies".
+func (a *Account) questsTrophies(n int32) {
+	if n > 0 {
+		a.questProgress(questResourceGained, n, func(d questDef) bool {
+			return d.Own["Resource"] == resourceRankPointsKey
+		})
+	}
+}
+
+// questsRoadTiers: tiers reached on the road count for "Advance on the
+// Adventure Road N times".
+func (a *Account) questsRoadTiers(n int32) {
+	if n > 0 {
+		a.questProgress(questSeasonRoadLevel, n, nil)
+	}
+}
+
 // ClaimQuest is 503: the quest's reward chest, made by the client.
 func (a *Account) ClaimQuest(r *Reward, id int32) bool {
+	a.refreshQuests()
+	pool := todaysQuests()
 	for i := range a.Quests {
 		q := &a.Quests[i]
-		d := dailyQuests[q.Index]
+		d := pool[q.Index]
 		if q.ID != id || q.Claimed || q.Progress < d.Target {
 			continue
 		}
@@ -154,6 +240,8 @@ func (a *Account) ClaimQuest(r *Reward, id int32) bool {
 		if n := len(a.Chests); ChestsInHome && n > 0 && a.Chests[n-1].Index == a.ChestIndex {
 			a.Chests[n-1].SourceValue = id
 		}
+		// the next quest takes the claimed one's place (in the next home)
+		a.topUpQuests()
 		return true
 	}
 	return false
@@ -197,8 +285,9 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 		}
 	}
 	w.VInt(int32(len(active)))
+	pool := todaysQuests()
 	for _, q := range active {
-		def := dailyQuests[q.Index]
+		def := pool[q.Index]
 		w.VInt(dailyPoolEvent)
 		w.VInt(q.Index)
 		w.VInt(def.TypeID)
@@ -221,17 +310,13 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 	}
 	// the pools' state (+0x0 event, +0x10 handed out, +0x20 the taken
 	// indices; encoder 0x31b864): a reroll (0x785fac) takes one back and
-	// picks among the free indices, so with the taken ones listed its pick
-	// is the server's
+	// picks among the free indices, so with all but one listed its pick is
+	// the server's (questPoolTaken)
 	if len(quests) > 0 {
 		w.VInt(1)
 		w.Int(dailyPoolEvent)
 		w.Int(int32(len(quests)))
-		var taken []int32
-		for _, q := range quests {
-			taken = append(taken, q.Index)
-		}
-		intList(w, taken)
+		intList(w, s.taken)
 	} else {
 		w.VInt(0)
 	}
@@ -247,8 +332,9 @@ func (a *Account) QuestSummary() string {
 	}
 	a.refreshQuests()
 	var l []string
+	pool := todaysQuests()
 	for _, q := range a.Quests {
-		d := dailyQuests[q.Index]
+		d := pool[q.Index]
 		st := ""
 		if q.Claimed {
 			st = " claimed"
@@ -260,6 +346,21 @@ func (a *Account) QuestSummary() string {
 
 func (d questDef) encodeState(w *proto.Writer) {
 	switch d.TypeID {
+	case questWinWithUnit:
+		// UseRoundWins, RequirementMini (a characters reference, 0x37cc70:
+		// row + 1, 0 for none) (0x4c7400 / 0x3d85dc). A Bool +0x11 follows
+		// only in the other form: the home's quests are read with flag 0
+		// (0x4bce10 → 0x3b3af4 → the state's reader), which reads the
+		// quest's tail and not that Bool. Writing it shifted the rest of
+		// the home (the client crashed in the next component).
+		r, _ := d.Own["UseRoundWins"].(bool)
+		w.Bool(r)
+		w.VInt(0)
+	case questPlayWithUnit:
+		w.VInt(0) // RequirementMini: none (0x5190c8)
+	case questResourceGained:
+		// Resource: a resources reference, row + 1 (0x473414)
+		w.VInt(resourceRankPoints + 1)
 	case questMetaUpgrade:
 		u, _ := d.Own["UnitUpgrades"].(bool)
 		h, _ := d.Own["HeroUpgrades"].(bool)
@@ -283,4 +384,5 @@ type questState struct {
 	quests  []Quest
 	lastID  int32
 	rerolls int32
+	taken   []int32 // the pool's taken indices (questPoolTaken)
 }

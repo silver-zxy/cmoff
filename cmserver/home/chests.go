@@ -175,9 +175,78 @@ func (a *Account) StartWithHero(heroRow int32) (*Reward, error) {
 		a.Heroes[i] = heroRow
 	}
 	a.Selected = 0
-	a.Gold = starterGold
-	r.Gold = starterGold
+	a.Gold, a.Gems = starterGold, starterGems
+	r.Gold, r.Gems = starterGold, starterGems
+	// a new pick replaces the chests of the one before
+	a.Chests = nil
+	a.StarterChests = false
+	a.giveStarterChests(r, heroRow)
 	return r, nil
+}
+
+// giveStarterChests puts the chosen hero's starting chests into the home
+// as the client does it (0x687ccc): one chest made of the hero's chest list
+// (starting_choices.csv FirstMatchChestId, the row's +0x48, 0x8c570c;
+// chest 0x71e890: id -1, the list at +0x10), source 8 (0x687e50). Its
+// content is all of them: the hero's chest, its deck's chest, 500 gold,
+// single mini fragments. The hero itself, in the hero chest's
+// collectibleList, the pick has unlocked already.
+func (a *Account) giveStarterChests(r *Reward, heroRow int32) bool {
+	var chests []int32
+	for _, c := range startingChoices {
+		if c.hero == heroRow {
+			chests = c.chests
+		}
+	}
+	if chests == nil || Data == nil {
+		return false
+	}
+	var all ChestContent
+	for _, id := range chests {
+		c, err := rollChest(a.random(), id)
+		if err != nil {
+			return false
+		}
+		all.add(c)
+	}
+	a.queueChestFrom(r, chests[0], sourceStarter, all)
+	if n := len(a.Chests); n > 0 {
+		a.Chests[n-1].List = chests
+		a.Chests[n-1].Show = true
+	}
+	a.StarterChests = true
+	return true
+}
+
+// catchUpStarter: an account that began before the starting chests and
+// values (0055) gets them now, once: the chests of its starting hero, the
+// gold the start lacked, the starting gems.
+func (a *Account) catchUpStarter(r *Reward) bool {
+	if !a.Progression || a.TutorialPending || a.StarterChests || !ChestsInHome {
+		return false
+	}
+	// the starting hero: the selected deck's first, then the others'
+	hero := int32(-1)
+	heroes := append([]int32{a.Heroes[a.Selected]}, a.Heroes[:]...)
+	for _, h := range heroes {
+		o := a.Collection[heroID(h)]
+		if hero >= 0 || o == nil || o.Level == 0 {
+			continue
+		}
+		for _, c := range startingChoices {
+			if c.hero == h {
+				hero = h
+			}
+		}
+	}
+	if hero < 0 || !a.giveStarterChests(r, hero) {
+		return false
+	}
+	a.Gold += starterGold - oldStarterGold
+	a.Gems += starterGems
+	r.Gold += starterGold - oldStarterGold
+	r.Gems += starterGems
+	return true
 }
 
 // autoUpgrade does what the client does after it applies a chest's content
@@ -223,12 +292,16 @@ func (a *Account) CatchUp() string {
 			a.queueChestFrom(r, upgradeRewardChest, sourceUpgrade, upgradeExpContent())
 		}
 	}
+	starter := a.catchUpStarter(r)
 	a.Unlock()
-	if len(r.Unlocked) == 0 && len(r.Upgraded) == 0 {
+	if len(r.Unlocked) == 0 && len(r.Upgraded) == 0 && !starter {
 		return ""
 	}
 	if err := a.Save(); err != nil {
 		return "caught up, but not saved: " + err.Error()
+	}
+	if starter {
+		return "caught up with the start (starting chests, gold, gems): " + r.String()
 	}
 	return "caught up with the client's own upgrades: " + r.String()
 }

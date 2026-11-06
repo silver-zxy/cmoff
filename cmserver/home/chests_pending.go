@@ -79,7 +79,7 @@ func (c ChestContent) String() string {
 		}
 		s += p
 	}
-	for _, name := range []string{"Gold", "Diamonds", "ExpPoints"} {
+	for _, name := range chestResourceNames {
 		if n := c.Resources[name]; n != 0 {
 			add(fmt.Sprintf("%d %s", n, name))
 		}
@@ -100,8 +100,11 @@ func (c ChestContent) String() string {
 
 // PendingChest is a chest waiting in the home to be opened.
 type PendingChest struct {
-	Index   int32        `json:"index"`
-	Chest   int32        `json:"chest"` // chests.json global id
+	Index int32 `json:"index"`
+	Chest int32 `json:"chest"` // chests.json global id
+	// List: a chest made of several (+0x10, the chest id -1; 0x71e890),
+	// as the starting chests (0x687ccc)
+	List    []int32      `json:"list,omitempty"`
 	Content ChestContent `json:"content"`
 	// Source: chest +0x30 (0x6b2ef8): 3 upgrade reward (602, 0x7eb55c), 6
 	// player level (0x8d9c1c: the level-up popup), 0 otherwise.
@@ -121,11 +124,15 @@ type PendingChest struct {
 // Chest sources (chest +0x30).
 const (
 	sourceUpgrade     int32 = 3
+	sourceStarter     int32 = 8 // the starting chest (0x687e50)
 	sourcePlayerLevel int32 = 6
 )
 
 // resources.csv rows of the resources a chest can give here.
-var resourceRows = map[string]int32{"Diamonds": 0, "Gold": 1, "ExpPoints": 11}
+var resourceRows = map[string]int32{"Diamonds": 0, "Gold": 1, "ExpPoints": 11, "PromotionToken": 13, "SeasonPoints": 14}
+
+// chestResourceNames: the resources above in a fixed order.
+var chestResourceNames = []string{"Gold", "Diamonds", "ExpPoints", "PromotionToken", "SeasonPoints"}
 
 func listInts(w *proto.Writer, xs []int32) {
 	w.VInt(int32(len(xs)))
@@ -136,7 +143,7 @@ func listInts(w *proto.Writer, xs []int32) {
 
 func (c ChestContent) encode(w *proto.Writer, show bool) {
 	var resIDs, resN, fragIDs, fragN []int32
-	for _, name := range []string{"Gold", "Diamonds", "ExpPoints"} {
+	for _, name := range chestResourceNames {
 		if n := c.Resources[name]; n > 0 {
 			resIDs = append(resIDs, globalID(classRESOURCES, resourceRows[name]))
 			resN = append(resN, n)
@@ -174,8 +181,16 @@ func encodeChests(w *proto.Writer, chests []PendingChest) {
 		w.Bool(false) // +6
 		w.Bool(false) // +4
 		w.Bool(true)  // +5: new
-		w.VInt(0)     // chest id list
-		w.VInt(c.Chest)
+		if len(c.List) > 0 {
+			w.VInt(int32(len(c.List))) // +0x10 the chest ids
+			for _, id := range c.List {
+				w.VInt(id)
+			}
+			w.VInt(-1)
+		} else {
+			w.VInt(0) // chest id list
+			w.VInt(c.Chest)
+		}
 		w.VInt(c.Index)
 		w.VInt(c.SourceValue) // +0x34
 		w.VInt(c.Source)
@@ -230,9 +245,13 @@ func (a *Account) addChest(r *Reward, chest, source int32, c ChestContent, push 
 		a.ChestIndex--
 		return
 	}
-	show := chest == winChest || source == sourcePlayerLevel
+	// level chests and shop purchases always open with the chest (a
+	// bought hero comes in a chest, not silently; chests.json has
+	// shop_miniHero_* without the opening)
+	always := source == sourcePlayerLevel || source == sourceShop
+	show := chest == winChest || always
 	if d, ok := Data.Chest(chest); ok {
-		show = d.ShowChestOpening || source == sourcePlayerLevel
+		show = d.ShowChestOpening || always
 	}
 	a.Chests = append(a.Chests, PendingChest{Index: a.ChestIndex, Chest: chest, Content: c,
 		Source: source, Show: show, Push: push})
@@ -326,6 +345,10 @@ func (a *Account) applyContent(r *Reward, c ChestContent) {
 			r.Gems += n
 		case "ExpPoints":
 			a.addExp(r, n)
+		case "SeasonPoints":
+			a.addSeasonPoints(r, n)
+		case "PromotionToken":
+			a.addCrystalCoins(r, n)
 		}
 	}
 	ids := make([]int, 0, len(c.Fragments))

@@ -263,3 +263,61 @@ func TestChronosEventsServerCommand(t *testing.T) {
 		t.Fatalf("%v %v", cmds, err)
 	}
 }
+
+// 601 (base, bool, tier) claims the road's tiers reached; 505 (base,
+// season) is read and keeps the tier seen.
+func TestClaimSeason(t *testing.T) {
+	acc, err := home.LoadAccount(filepath.Join(t.TempDir(), "accounts.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc.SetProgression("fresh")
+	key, _, _ := acc.SeasonSummary()
+	acc.Season.Points = 7
+	b := turn(func(w *proto.Writer) {
+		w.VInt(2)
+		w.VInt(601)
+		baseW(w)
+		w.Bool(false)
+		w.VInt(1)
+		w.VInt(505)
+		baseW(w)
+		w.VInt(key)
+	})
+	cmds, err := parseEndClientTurn(b)
+	if err != nil || len(cmds) != 2 || cmds[0].typ != cmdClaimSeason || cmds[1].typ != cmdSeasonSeen || cmds[1].args[0] != key {
+		t.Fatalf("%v %v", cmds, err)
+	}
+	apply(acc, cmds)
+	if _, pts, claimed := acc.SeasonSummary(); pts != 7 || claimed != 7 || acc.Season.PaidClaimed != 7 || acc.Season.Seen != 7 {
+		t.Fatalf("season %+v", acc.Season)
+	}
+}
+
+// 702 (base, event, item) buys from today's shop.
+func TestBuyChest(t *testing.T) {
+	acc, err := home.LoadAccount(filepath.Join(t.TempDir(), "accounts.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc.SetProgression("fresh")
+	acc.Gold = 500
+	ev := home.LiveEvents()[2]
+	b := turn(func(w *proto.Writer) {
+		w.VInt(1)
+		w.VInt(702)
+		baseW(w)
+		w.VInt(ev.ID)
+		w.VInt(0)
+	})
+	cmds, err := parseEndClientTurn(b)
+	if err != nil || len(cmds) != 1 || cmds[0].typ != cmdBuyChest || cmds[0].args[0] != ev.ID {
+		t.Fatalf("%v %v", cmds, err)
+	}
+	apply(acc, cmds)
+	// without game data there are no mini offers: item 0 is a hero's 25
+	// fragments for 100 gems
+	if acc.Gold != 500 || acc.Gems != 0 || len(acc.Purchases) != 1 {
+		t.Fatalf("gold %d gems %d purchases %+v", acc.Gold, acc.Gems, acc.Purchases)
+	}
+}

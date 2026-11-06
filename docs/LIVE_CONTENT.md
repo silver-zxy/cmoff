@@ -142,3 +142,123 @@ Fifth test: still the old quest again, without rewards. Two causes:
   (0x72049c copies def +0x28), whose "Rewards" are chest names
   (0x5887fc → 0x865888, a lookup by name). Numbers found nothing. The pool
   JSON now names them (from the APK's chests.json).
+
+## Adventure Road (`home/season.go`)
+
+- The road is a SEASON_DATA event (type 4, 0x49c3ac): SeasonName,
+  SeasonIndex, `SeasonPassTiers` (0x5fd020; a tier 0x3291ec: `PointsReq`,
+  `FreeChests`, `PaidChests` by chest name, optional `FreeVisualStyle`,
+  `PaidVisualStyle`, `RoadVisualStyle` (unknown → default, 0x5e4ed0),
+  `IsKeyTier`), the passes as optional shop items (`BasePass`,
+  `PremiumPass`, parsed as shop items by 0x6bb398).
+- `VisualConfig` (0x786afc: `TierFileName`, `TierExportName`,
+  `ProgressMarkerFileName`, `ProgressMarkerExportName`, `Decorations`) is
+  required: the road screen reads it without a check (0x6f24c8 → pass
+  +0x18 → 0x689b84, a null pointer crash when missing). Ours names the
+  game's `sc/season_road_01.sc` and its exports `road_segment` and
+  `progress_marker` (season_road_segments.csv names the same file).
+- The "i" button: `HasInfoPage` and `InfoPageConfig` (0x6e95a8:
+  `InfoPageSWF`, `LayoutExportName`, `PagesExportName` a list). The road
+  file has one info page, `season_info_1_layout` / `season_info_1_page_1`
+  (texts TID_SEASON_INFO_SEASON_1_*). `SeasonName`
+  TID_SEASONROAD_SEASON1_NAME is "The Adventure Begins".
+- `season_rewards.csv` is not the road: it holds the league's end of season
+  rewards by stars (season*_EndStars_*).
+- Home +0x1c8, the season manager (0x31e77c / 0x4bb660): VInt current
+  season key (+0x18), VInt +0x20, VInt +0x1c, entries: VInt event id (the
+  client finds its SEASON_DATA event by it, 0x6116b8, else a default
+  season), VInt season key, optional progress (0x4aa038): VInt, VInt points
+  (+0x40), Bool pass (+0x4c), VInt highest free PointsReq claimed (+0x44;
+  claimed when ≥ PointsReq, 0x4ebaf8), the same for the paid lane (+0x48),
+  per-tier lists the client rebuilds from the event (0x6eda50).
+- 601 LogicClaimAllSeasonRewardsCommand (0x4c59a0: base, Bool, VInt tier;
+  execute 0x6bacac → 0x3ac468): every tier reached and not claimed
+  (0x8ee9b0) gives its chests as one chest (source 5, value the season
+  key); the server pushes the content (420).
+- 505 LogicUpdateSeasonTierSeenCommand (base, VInt season key): the client
+  puts the index of the highest tier reached (0x5b3bf0, −1 none) into home
+  +0x1e0.
+- Pony Fuel is the resource SeasonPoints (resources.csv row 14); every
+  daily quest chest holds one.
+- Ours (patch 0065): Season 1 as the game knew it, again every two
+  calendar months (UTC): 90 tiers, 1 fuel each on tiers 1–30, 2 on 31–60,
+  3 on 61–90 (180 in all; the wiki says 1–3, the split is ours). The free
+  lane: the game's season chests (gold, gems, one fragment of any mini,
+  hero fragments; the season's mini on tiers 10, 30, 60). The Mini Pass
+  lane is everyone's (progress +0x4c true, 601 claims both lanes): the
+  P.L.U.S.H. P.E.K.K.A at tier 26 and the Luchador Monk at tier 87 (wiki),
+  and the pass's "300+ Hero Fragments, 200 Gems, 2000 Gold" (its text):
+  Monk 50, Countess 10, hero chests (about 334 fragments in all), gems
+  40 + 100 + 40 + 20, gold 8 × 250. A road saved when a season was one
+  month keeps its fuel.
+- Quests count the road: "Advance on the Adventure Road N times"
+  (MetaSeasonRoadLevel 24, no state) counts the tiers the fuel reaches.
+
+## Shop (`home/shop.go`)
+
+- A SHOP_LAYOUT event (type 0, 0x46e118): `Modules`, each (0x8e6494)
+  `ModuleName` (shop_modules.csv: BasicModule, PermCurrencyModule, …),
+  `ModuleTitle`, `Items`, `RotatingItems`, `CountdownMode`, `RotationTimer`,
+  `EndTimer`, `Priority`, `HideSoldOutItems`, `RegularItemsRefreshDaily`;
+  an item (0x6bb398): `ResourceType` (a resource's name, 0x6e88c8),
+  `ResourceCost`, `IAP`, `ExtraValuePercent`, `PurchaseLimit`, `ItemTID`,
+  `ButtonWidgetType` (SmallIcon/LargeIcon), `ButtonWidgetImage`, `Chests`
+  (by name), `ShowConfirmPopup`.
+- The clock of a module or item: `CountdownMode` "ForceNoShow" (1),
+  "RotationTimer" (2), "EndTimer" (3, to the event's end), none when
+  missing (0x8e6864, items 0x5b6060). Ours: EndTimer, the next day's shop.
+- An item's number counts over the modules, each module's Items before its
+  RotatingItems (0x503e08).
+- The buy button (0x3405e4, by the item's state 0x39e714: 0 buyable,
+  1 too expensive, 2 limit reached, 3 free) goes to 0x4bddec: an item with
+  an IAP product starts the store purchase (701 LogicStartChronosPurchase-
+  FlowCommand, 421 and 309 from the server), any other sends
+  **702 LogicBuyChestCommand** (ctor 0x74a208: base, VInt event, VInt item;
+  execute 0x93286c): the client checks price and limit, takes the price,
+  counts the purchase in the event manager's list (+0x28, 0x461c20) and
+  makes one chest of the item's chests (source 4, value the event id); the
+  server pushes the content (420).
+- The purchases come with the home: the chronos part's first (VInt, VInt)
+  list (0x8198f8) holds (event, item), the limits count them (0x6e5130).
+- Ours (patch 0065), as on screenshots of 1.1143.2 (docs/ORIGINAL.md):
+  one shop a day (UTC) with its own event id (the limits start anew).
+  Minis: three offers, one fragment each, once each, for 250 / 500 / 750
+  gold by the mini's elixir cost (characters.csv ManaCost, read from the
+  APK at runtime: home/sclzma.go decodes the LZMA of csv_logic). Heroes:
+  three offers, 25 fragments (shop_miniHero_*_25) for 100 gems, five
+  times each. No gem packs or bundles (real money); the Clashmas skins and
+  the Crystal Coin skins come with the skins (ROADMAP A5).
+
+## Daily quest pool
+
+- QUEST_SETTINGS: six daily quests a day, three at a time, one reroll
+  ("Quests completed: 0/6" and three daily quests on the screenshots).
+  The server hands out three; a claim makes room for the next, which comes
+  with the next home.
+- The pool: seven quests a day out of the catalog (six and one for the
+  reroll). The home's pool state lists every index but the reroll's as
+  taken, the ones still to come too, so the client's reroll (0x785fac,
+  random among the free indices) takes the pool's last quest; an index
+  rerolled away is not handed out again.
+- Kinds the server counts: PlayGameMode (duels, rumbles), PlayWithUnit (2,
+  state: VInt RequirementMini, 0 none), WinWithUnit (1, state: Bool
+  UseRoundWins, VInt RequirementMini; a duel won or a Rumble in the top 4), WinRumble, MetaResourceGained (25, state: VInt resource row + 1;
+  RankPoints, "Win N Trophies", ranked trophies won), MetaSeasonRoadLevel.
+  The data references are written by 0x37cc70: VInt row + 1, 0 for none.
+- The home reads its quests with flag 0 (0x4bce10 → 0x3b3af4): with the
+  quest's tail (+0x30 …) and the states' short form. WinWithUnit's Bool
+  +0x11 (also WinDuelPerfect's and WinGameNoReroll's Bool) belongs to the
+  other form only; 0065 wrote it and the home's next component read past
+  its end (a crash at login, fixed in 0066).
+- Rewards: the game's chests, as on the screenshots: quest_Daily_Small
+  (1 Pony Fuel, 10–30 gold) or quest_gold_100 with SeasonPoint_1 ("100
+  gold" and a fuel). The amounts to reach are ours (ROADMAP B5).
+- Quest kind ids (0x3807a8): WinWithUnit 1, PlayWithUnit 2, UpgradeUnit 3,
+  TotalKOs 4, UseKeywordClash 5, UseKeywordEvolve 6, EndRoundWithUnitAlive
+  7, MetaOpenChests 8, MetaUpgrade 9, MetaPlayerLevel 10,
+  MetaUsePromotionToken 11, MetaChangeDeck 17, WinDuelPerfect 18,
+  WinRumble 19, WinGameNoReroll 20, WinRoundNoDeath 21, WinWithUnitList 22,
+  AbilityHitInOneGame 23, MetaSeasonRoadLevel 24, MetaResourceGained 25,
+  PlayGameMode 26 (state classes by 0x506b4c, their writers at vtable
+  +0x18). The battle kinds (rounds, knock outs, rerolls, 3:0) need what
+  happened in the battle, which the hook does not report yet.

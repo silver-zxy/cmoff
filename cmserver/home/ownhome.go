@@ -57,6 +57,9 @@ type clientHome struct {
 	daily      dailyGold      // +0xb4..+0xc4: battle gold left today
 	quests     questState     // +0x180: the daily quests (quests.go)
 	events     []LiveEvent    // +0x140/+0x10: the chronos events (live.go)
+	season     *SeasonState   // +0x1c8: the Adventure Road (season.go)
+	purchases  []Purchase     // +0x140/+0x28: shop purchases (shop.go)
+	seasonSeen int32          // +0x1e0
 }
 
 // dailyGold is the home's daily battle gold state (0x59a380, 0x54a9a4):
@@ -136,16 +139,16 @@ func (h *clientHome) encode(w *proto.Writer) {
 	w.Long(h.homeID[0], h.homeID[1])
 	w.VInt(h.chestIndex) // +0xb0
 	h.encodeCollection(w)
-	encodeHomeHead(w, h.events)
+	encodeHomeHead(w, h.events, h.purchases)
 	h.daily.encode(w)
 	encodeHomeHead2(w)
 	w.VInt(h.flags130)
 	encodeHomeTail(w)
 	encodeQuests(w, h.quests, h.daily)
 	h.encodeMaps(w)
-	encodeHomeEnd(w, h.skinStore, h.skinSel)
+	encodeHomeEnd(w, h.skinStore, h.skinSel, h.season)
 	encodeChests(w, h.chests)
-	encodeHomeEnd2(w)
+	encodeHomeEnd2(w, h.seasonSeen)
 }
 
 func (h *clientHome) encodeCollection(w *proto.Writer) {
@@ -201,21 +204,28 @@ func (h *clientHome) encodeMaps(w *proto.Writer) {
 // encodeHomeHead mirrors the client from 0x8197fc up to +0x130. Boolean runs
 // pack across the internal sub-encoder boundaries (0x8197fc's last flag shares
 // a byte with 0x4f61d8's three), which proto.Writer.Bool reproduces.
-func encodeHomeHead(w *proto.Writer, events []LiveEvent) {
+func encodeHomeHead(w *proto.Writer, events []LiveEvent, purchases []Purchase) {
 	w.VInt(0) // +0x140
 	// +0x10 present: home init (0x60add4 -> 0x476b88) reads its first field
 	// without a null check. 0x7ea4f4: the chronos events, as in 417
 	// (live.go).
 	w.Bool(true)
 	EncodeEvents(w, events)
-	encodeHomeHeadRest(w)
+	encodeHomeHeadRest(w, purchases)
 }
 
 // encodeHomeHeadRest continues encodeHomeHead after the events.
-func encodeHomeHeadRest(w *proto.Writer) {
+func encodeHomeHeadRest(w *proto.Writer, purchases []Purchase) {
 	w.Bool(false) // +0x20
-	vints(w, 4)   // four LogicLong lists
-	w.VInt(0)     // map of bool-flagged entries
+	// four lists of (VInt, VInt) (0x9052f4); the first (+0x28) the shop
+	// purchases, (event, item) (0x461c20)
+	w.VInt(int32(len(purchases)))
+	for _, p := range purchases {
+		w.VInt(p.Event)
+		w.VInt(p.Item)
+	}
+	vints(w, 3)
+	w.VInt(0) // map of bool-flagged entries
 	vints(w, 6)
 	w.VInt(0)
 	w.VInt(0) // two VInt lists
@@ -263,7 +273,7 @@ func encodeHomeTail(w *proto.Writer) {
 }
 
 // encodeHomeEnd mirrors the client after the maps at +0x200.
-func encodeHomeEnd(w *proto.Writer, skinStore bool, skinSel map[int32]int32) {
+func encodeHomeEnd(w *proto.Writer, skinStore bool, skinSel map[int32]int32, season *SeasonState) {
 	vints(w, 4)   // +0x188..+0x194
 	w.Bool(false) // +0xac
 	w.Bool(false)
@@ -282,22 +292,22 @@ func encodeHomeEnd(w *proto.Writer, skinStore bool, skinSel map[int32]int32) {
 	} else {
 		w.VInt(0)
 	}
-	vints(w, 4) // 0x31e77c (+0x1c8)
+	encodeSeason(w, season) // 0x31e77c (+0x1c8), season.go
 	// then the chest manager (encodeChests)
 }
 
 // encodeHomeEnd2 continues encodeHomeEnd after the chest manager.
-func encodeHomeEnd2(w *proto.Writer) {
+func encodeHomeEnd2(w *proto.Writer, seasonSeen int32) {
 	w.Bool(false) // optional object +0x1d0
 	w.String("")  // +0x1e8
 	w.VInt(0)
-	w.VInt(0)     // +0x1f8 +0x1d8
-	w.Bool(false) // +0x1dc
-	w.VInt(0)     // +0x1e0
-	w.String("")  // +0x280
-	w.VInt(0)     // +0x290
-	vints(w, 2)   // 0x7ee56c (+0x278)
-	w.VInt(0)     // pair list
+	w.VInt(0)          // +0x1f8 +0x1d8
+	w.Bool(false)      // +0x1dc
+	w.VInt(seasonSeen) // +0x1e0: the road's last tier seen (505)
+	w.String("")       // +0x280
+	w.VInt(0)          // +0x290
+	vints(w, 2)        // 0x7ee56c (+0x278)
+	w.VInt(0)          // pair list
 	vints(w, 2)
 	vints(w, 20) // 0x720dac x2, 10 each
 	vints(w, 3)

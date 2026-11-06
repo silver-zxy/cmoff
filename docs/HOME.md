@@ -194,3 +194,24 @@ battleCounts, battleRankTopCounts, the two streaks, seasonBestScore.
 
 The collection itself (all minis, heroes, skins at max) is not stored; every
 account has all of it.
+
+## The start (`home/chests.go`, `home/collection.go`)
+
+As the game's data has it:
+
+- `globals.csv` STARTING_GOLD 500 and STARTING_DIAMONDS 100 (the server
+  gave 100 gold and no gems before).
+- The tutorial's hero pick unlocks the hero and the base deck (Knight,
+  Barbarian, Archer, Spear Goblin, Wizard, level 1) and puts the hero's
+  twelve starting chests into the home (`starting_choices.csv`
+  FirstMatchChestId): the hero chest (two fragments; its collectibleList
+  holds the hero, already unlocked by the pick), the deck chest (five
+  fragments), 500 gold, single fragments (3 Spear Goblin, 4 Wizard, two
+  more minis). As the client makes it (0x687ccc): **one** chest of the
+  list (0x6e1a5c → 0x71e890: chest id −1, the ids at +0x10), source 8,
+  opened with the chest. The fragments unlock four new minis and upgrade
+  some; the client's own auto-upgrades bring exp chests (0x7eb554), so the
+  first level comes with it.
+- Accounts from before get it once at the server's start (`CatchUp`): the
+  chests of their starting hero (the selected deck's first), the 400 gold
+  the start lacked and the 100 gems (`starter_chests` in accounts.json).

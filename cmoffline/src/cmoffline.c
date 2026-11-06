@@ -208,18 +208,16 @@ static void install_crash_logger(void) {}
 #define LIBG_COL_BOTCONFIG 0xf57740
 #define NPC_OFFLINE_ROW    3           /* FirstMatch, SecondMatch, ThirdMatch, OfflineMatch */
 /* Bot decks (bot_decks.csv, data class 133, table *(libg+0x1080b70)) carry
- * their own levels: heroes 1-10, minis 1-4, low in the Silver/Gold pools.
- * The deck object caches them at load (ctor 0x5b49ac): hero level at +0x40,
- * mini levels as an int list at +0x58 with its count at +0x64 (minis list
- * +0x48/+0x54). Our account is maxed, so the hook raises every bot deck to
- * the same levels before each battle: fair fights. */
+ * their own levels, by league: heroes 1-10, minis 1-4 (Bronze low,
+ * Grandmaster and the FF decks maxed), as in the original. The deck object
+ * caches them at load (ctor 0x5b49ac): hero level at +0x40, mini levels as
+ * an int list at +0x58 with its count at +0x64 (minis list +0x48/+0x54).
+ * The hook keeps those levels; only when the server sends levels (the
+ * unlocked collection, no progression) it sets every deck to them. The
+ * generated decks (BOT_DECK_NORMAL / NEWBIE / RANDOM) are not in the table. */
 #define LIBG_BOTDECK_TABLE 0x1080b70
-#ifndef BOT_HERO_LEVEL
-#define BOT_HERO_LEVEL 10
-#endif
-#ifndef BOT_MINI_LEVEL
-#define BOT_MINI_LEVEL 4
-#endif
+#define BOTDECK_MAX        256
+#define BOTDECK_MINIS      8
 #ifndef BOT_CONFIGS
 /* Used only when the server sends no config (it picks one by trophies).
  * bot_configs.csv: 5 Silver3, 6 Silver2, 7 Silver1, 8 Gold3, 9 Gold2,
@@ -252,7 +250,7 @@ static volatile int keepalives_out;     /* KeepAlives sent, not yet answered */
 static volatile int pending_mode;       /* >0: start an offline battle */
 static volatile int pending_hold;       /* keep the offline flag for the whole battle */
 static volatile int pending_bot;        /* bot config from the server, 0 = random */
-static volatile int pending_hero_level; /* bot levels from the server, 0 = defaults */
+static volatile int pending_hero_level; /* bot levels from the server, 0 = the decks' own */
 static volatile int pending_mini_level;
 static volatile int battle_mode;        /* mode of the battle being played */
 static volatile int tutorial;           /* the client plays its tutorial offline */
@@ -385,29 +383,51 @@ static int *npc_cell(uint8_t *row, uint32_t col_global) {
     return cells ? &cells[index] : NULL;
 }
 
-/* Every bot deck at our levels: the server sends the player's (hero of the
- * selected deck, average mini level); without them BOT_HERO_LEVEL and
- * BOT_MINI_LEVEL (10 and 4, the unlocked collection). */
+/* The decks' own levels, saved before the hook first changes them. */
+static int botdeck_saved;
+static int botdeck_count;
+static int32_t botdeck_hero[BOTDECK_MAX];
+static int32_t botdeck_minis[BOTDECK_MAX][BOTDECK_MINIS];
+
+/* Bot deck levels for the next battle: the server's (hero, mini 1-10 / 1-4)
+ * for every deck, or with 0 the decks' own levels from bot_decks.csv. */
 static void level_bot_decks(int hero_level, int mini_level) {
-    if (hero_level < 1 || hero_level > 10) hero_level = BOT_HERO_LEVEL;
-    if (mini_level < 1 || mini_level > 4) mini_level = BOT_MINI_LEVEL;
+    int own = hero_level < 1 || hero_level > 10 || mini_level < 1 || mini_level > 4;
     uint8_t *table = *(uint8_t **)G(LIBG_BOTDECK_TABLE);
     if (!table) { LOG("bot: deck table not loaded"); return; }
     void **vt = *(void ***)table;
     int count = ((int (*)(void *))vt[0x30 / 8])(table);
+    if (count > BOTDECK_MAX) count = BOTDECK_MAX;
+    if (!botdeck_saved) {
+        if (own) return; /* nothing changed yet: the decks have their own */
+        for (int i = 0; i < count; i++) {
+            uint8_t *deck = ((uint8_t *(*)(void *, int))vt[0x38 / 8])(table, i);
+            if (!deck) continue;
+            botdeck_hero[i] = *(int32_t *)(deck + 0x40);
+            int32_t *levels = *(int32_t **)(deck + 0x58);
+            int n = *(int32_t *)(deck + 0x64);
+            for (int j = 0; levels && j < n && j < BOTDECK_MINIS; j++)
+                botdeck_minis[i][j] = levels[j];
+        }
+        botdeck_count = count;
+        botdeck_saved = 1;
+    }
     int decks = 0;
-    for (int i = 0; i < count && i < 4096; i++) {
+    for (int i = 0; i < count && i < botdeck_count; i++) {
         uint8_t *deck = ((uint8_t *(*)(void *, int))vt[0x38 / 8])(table, i);
         if (!deck) continue;
         int32_t *hero = (int32_t *)(deck + 0x40);
-        if (*hero > 0 && *hero <= 10) *hero = hero_level;
+        if (botdeck_hero[i] > 0 && botdeck_hero[i] <= 10)
+            *hero = own ? botdeck_hero[i] : hero_level;
         int32_t *levels = *(int32_t **)(deck + 0x58);
         int n = *(int32_t *)(deck + 0x64);
-        for (int j = 0; levels && j < n && j < 16; j++)
-            if (levels[j] > 0 && levels[j] <= 4) levels[j] = mini_level;
+        for (int j = 0; levels && j < n && j < BOTDECK_MINIS; j++)
+            if (botdeck_minis[i][j] > 0 && botdeck_minis[i][j] <= 4)
+                levels[j] = own ? botdeck_minis[i][j] : mini_level;
         decks++;
     }
-    LOG("bot: %d decks set to hero level %d, mini level %d", decks, hero_level, mini_level);
+    if (own) LOG("bot: %d decks back at their own levels", decks);
+    else LOG("bot: %d decks set to hero level %d, mini level %d", decks, hero_level, mini_level);
 }
 
 /* The bot strength for the next offline battle: the server's choice (by our

@@ -38,6 +38,8 @@ type Account struct {
 	Progression bool  `json:"progression"`
 	Gold        int32 `json:"gold"`
 	Gems        int32 `json:"gems"`
+	// CrystalCoins: the resource PromotionToken
+	CrystalCoins int32 `json:"crystal_coins,omitempty"`
 	// Battle gold earned on GoldDay (daily limit, economy.go).
 	GoldDay   string `json:"gold_day,omitempty"`
 	GoldToday int32  `json:"gold_today,omitempty"`
@@ -48,12 +50,18 @@ type Account struct {
 	// LevelChests: player levels whose level chest was given.
 	LevelChests []int32 `json:"level_chests,omitempty"`
 	// Daily quests (quests.go): today's, the day, the last quest id.
-	Quests       []Quest          `json:"quests,omitempty"`
-	QuestDay     string           `json:"quest_day,omitempty"`
-	QuestID      int32            `json:"quest_id,omitempty"`
-	QuestRerolls int32            `json:"quest_rerolls,omitempty"`
-	QuestPool    string           `json:"quest_pool,omitempty"`
-	Collection   map[int32]*Owned `json:"collection,omitempty"`
+	Quests       []Quest `json:"quests,omitempty"`
+	QuestDay     string  `json:"quest_day,omitempty"`
+	QuestID      int32   `json:"quest_id,omitempty"`
+	QuestRerolls int32   `json:"quest_rerolls,omitempty"`
+	QuestPool    string  `json:"quest_pool,omitempty"`
+	// QuestDropped: today's pool indices rerolled away (not handed out again)
+	QuestDropped []int32     `json:"quest_dropped,omitempty"`
+	Season       SeasonState `json:"season"`
+	Purchases    []Purchase  `json:"purchases,omitempty"`
+	// StarterChests: the starting chests have been given (chests.go)
+	StarterChests bool             `json:"starter_chests,omitempty"`
+	Collection    map[int32]*Owned `json:"collection,omitempty"`
 	// ResetToken: the last "reset:<token>" applied, so a build that resets
 	// does it once and not on every start.
 	ResetToken string `json:"reset_token,omitempty"`
@@ -269,13 +277,16 @@ func (a *Account) ownHome() ownHomeData {
 	h.events = LiveEvents()
 	if Live {
 		a.refreshQuests()
-		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls}
+		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken()}
 		// the server time, unix seconds: the tail's second VInt (msg +0x9c,
 		// 0x48b2e4) becomes the logic's time base (+0x1d4 via 0x85f100,
 		// 0x327c54; now = ticks/20 + base, 0x4df510). At 0 the events'
 		// windows lie in the future: the quest pool is inactive and a reroll
 		// (0x5e0478 finds no pool) rebuilds the old quest (0x8c8c8c).
 		m.tail[1] = int32(now().Unix())
+		h.season = a.season()
+		h.purchases = a.todaysPurchases()
+		h.seasonSeen = h.season.Seen - 1
 	}
 	return m
 }

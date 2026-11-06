@@ -106,6 +106,7 @@ func (a *Account) BattleResult(mode, place int32, ranked bool) (o Outcome) {
 		a.BestTrophies = a.Trophies
 	}
 	o.Trophies = d
+	a.questsTrophies(d)
 	return o
 }
 

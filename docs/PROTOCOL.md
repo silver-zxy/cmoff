@@ -139,8 +139,9 @@ KeepAliveServer (20108) the client never asked for, padded with
 
 bytes (`srv.BattleSignalLen`; mode 2/3, hold = keep the battle offline
 throughout, an experiment; bot config 0–15 by the account's trophies
-(`home.BotConfig`); bot levels = the player's selected hero and average deck
-mini level, 0 = hook default). The decoder of 20108 reads nothing, so the
+(`home.BotConfig`); bot levels 0 = the decks' own (bot_decks.csv, by league,
+with progression), else every deck at them (10 and 4 for the unlocked
+collection)). The decoder of 20108 reads nothing, so the
 padding is harmless; the hook reads it from the plaintext frame length
 (ciphertext = body + 16).
 

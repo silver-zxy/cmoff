@@ -27,6 +27,9 @@ const (
 	cmdChestOpenFinish  = 550 // LogicChestOpenFinishCommand: base, vint chest index
 	cmdClaimQuest       = 503 // LogicClaimQuestRewardCommand: base, vint quest id, bool
 	cmdRerollQuest      = 502 // LogicRerollQuestCommand: base, vint quest id
+	cmdClaimSeason      = 601 // LogicClaimAllSeasonRewardsCommand: base, bool, vint tier
+	cmdSeasonSeen       = 505 // LogicUpdateSeasonTierSeenCommand: base, vint season
+	cmdBuyChest         = 702 // LogicBuyChestCommand: base, vint event, vint item
 	cmdSkipTutorial     = 607
 	cmdCompleteTutorial = 988
 )
@@ -37,7 +40,6 @@ const (
 // and row).
 var skipLayouts = map[int32]struct{ name, layout string }{
 	504: {"LogicChooseGameModeCommand", "bvo"}, // mode, ranked
-	505: {"LogicUpdateSeasonTierSeenCommand", "bv"},
 	506: {"LogicMarkSurveyLinkSeenCommand", "bv"},
 	550: {"LogicChestOpenFinishCommand", "bv"},
 	593: {"LogicMetaSelectModifierCommand", "bvvv"},
@@ -48,7 +50,6 @@ var skipLayouts = map[int32]struct{ name, layout string }{
 	604: {"LogicTutorialSetReqStateHomeCommand", "dvob"}, // tutorial, state, flag
 	605: {"LogicTutorialTryRestartCommand", "b"},
 	607: {"LogicSkipTutorialCommand", "b"},
-	702: {"LogicBuyChestCommand", "bvv"},
 	988: {"LogicCompleteTutorialHomeCommand", "db"}, // tutorial
 	// the client echoes our name server command: name, changes, set, base
 	411: {"LogicChangeAvatarNameCommand", "siovb"},
@@ -83,6 +84,12 @@ func (c command) String() string {
 		return fmt.Sprintf("LogicRerollQuestCommand quest %d", c.args[0])
 	case cmdClaimQuest:
 		return fmt.Sprintf("LogicClaimQuestRewardCommand quest %d", c.args[0])
+	case cmdClaimSeason:
+		return fmt.Sprintf("LogicClaimAllSeasonRewardsCommand tier %d", c.args[0])
+	case cmdSeasonSeen:
+		return fmt.Sprintf("LogicUpdateSeasonTierSeenCommand season %d", c.args[0])
+	case cmdBuyChest:
+		return fmt.Sprintf("LogicBuyChestCommand event %d item %d", c.args[0], c.args[1])
 	case cmdServerUpdateChronosEvents:
 		return "LogicUpdateChronosEventsCommand (ours, echoed)"
 	case cmdServerClaimReward:
@@ -159,6 +166,19 @@ func parseEndClientTurn(p []byte) (cmds []command, err error) {
 			base(r)
 			c.args = []int32{r.VInt()}
 			r.Bool()
+		case cmdClaimSeason:
+			// encoder 0x4c59a0: base, Bool (+0x1c), VInt tier (+0x20)
+			base(r)
+			c.flag = r.Bool()
+			c.args = []int32{r.VInt()}
+		case cmdSeasonSeen:
+			// encoder 0x7ee1c8: base, VInt season key (+0x1c)
+			base(r)
+			c.args = []int32{r.VInt()}
+		case cmdBuyChest:
+			// ctor 0x74a208: base, VInt event (+0x1c), VInt item (+0x20)
+			base(r)
+			c.args = []int32{r.VInt(), r.VInt()}
 		case cmdUnlockCollect:
 			// encoder 0x6d5ca0: base, writeInt id, writeVInt level
 			base(r)
@@ -271,6 +291,25 @@ func apply(acc *home.Account, cmds []command) (matchMode int32, ranked bool) {
 				continue
 			}
 			log.Printf("   quest %d claimed: %s", c.args[0], rw.String())
+		case cmdClaimSeason:
+			rw := &home.Reward{}
+			n := acc.ClaimSeasonRewards(rw)
+			if n == 0 {
+				log.Printf("   adventure road claimed, but the server has no tier to give")
+				continue
+			}
+			k, pts, claimed := acc.SeasonSummary()
+			log.Printf("   adventure road: %d tiers claimed (season %d, %d fuel, up to %d)", n, k, pts, claimed)
+		case cmdSeasonSeen:
+			acc.SeeSeasonTier()
+		case cmdBuyChest:
+			rw := &home.Reward{}
+			chest, why := acc.BuyShopItem(rw, c.args[0], c.args[1])
+			if chest == 0 {
+				log.Printf("   shop: item %d bought, but the server refused: %s", c.args[1], why)
+				continue
+			}
+			log.Printf("   shop: item %d bought, chest %d (%d gold, %d gems left)", c.args[1], chest, acc.Gold, acc.Gems)
 		case cmdChestOpenFinish:
 			r, chest, ok := acc.OpenPending(c.args[0])
 			if !ok {

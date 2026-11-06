@@ -251,8 +251,12 @@ func (s *Server) handle(c net.Conn) {
 				if ranked {
 					kind = "ranked"
 				}
-				log.Printf("-> battle signal (mode %d, %s, bot config %d for %d trophies, %s, bot levels hero %d mini %d)",
-					mode, kind, cfg, trophies, home.LeagueName(trophies), hero, mini)
+				levels := "the decks' own levels"
+				if hero > 0 {
+					levels = fmt.Sprintf("bot levels hero %d mini %d", hero, mini)
+				}
+				log.Printf("-> battle signal (mode %d, %s, bot config %d for %d trophies, %s, %s)",
+					mode, kind, cfg, trophies, home.LeagueName(trophies), levels)
 				s.send(c, sess, proto.KeepAliveOk, pad)
 			}
 
@@ -437,6 +441,10 @@ func (s *Server) sendHome(c net.Conn, sess *pepper.Session) {
 	}
 	if q := s.acc.QuestSummary(); q != "" {
 		log.Printf("-> home with quests: %s", q)
+	}
+	if home.Live {
+		k, pts, claimed := s.acc.SeasonSummary()
+		log.Printf("-> home with adventure road: season %d, %d pony fuel, claimed up to %d", k, pts, claimed)
 	}
 	s.send(c, sess, proto.OwnHomeData, s.acc.OwnHomeData())
 }

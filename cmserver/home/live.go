@@ -2,6 +2,7 @@ package home
 
 import (
 	"encoding/json"
+	"math/rand"
 	"time"
 
 	"cmserver/proto"
@@ -16,9 +17,7 @@ import (
 //     QUEST_SETTINGS, ROTATING_SHOP;
 //   - Chronos events, sent with LogicUpdateChronosEventsCommand 417.
 //
-// This is the first step: quest settings and one daily quest pool, to see
-// whether the client takes them. The quests are our own, made of the
-// game's quest kinds and reward chests.
+// The quests are made of the game's quest kinds, texts and reward chests.
 
 // Live: send the live content (server option live=on|off).
 var Live = true
@@ -32,10 +31,10 @@ func LiveGlobals() []string {
 		"ID": "QUEST_SETTINGS",
 		"Params": map[string]any{
 			"Enabled":                   true,
-			"MaxConcurrentQuests":       3,
-			"MaxConcurrentDailyQuests":  3,
-			"MaxTotalDailyQuests":       3,
-			"DailyQuestRerollLimit":     1,
+			"MaxConcurrentQuests":       questsConcurrent,
+			"MaxConcurrentDailyQuests":  questsConcurrent,
+			"MaxTotalDailyQuests":       questsPerDay,
+			"DailyQuestRerollLimit":     questRerollsPerDay,
 			"MaxConcurrentWeeklyQuests": 0,
 			"MaxTotalWeeklyQuests":      0,
 			"WeeklyQuestRerollLimit":    0,
@@ -107,36 +106,91 @@ type questDef struct {
 	Own     map[string]any
 }
 
-// Reward chests of chests.json (quest_*).
+// Reward chests of chests.json. quest_Daily_Small is the daily quest's
+// "1 Pony Fuel, 10-30 gold" of the screenshots; the "100 gold" quests give
+// quest_gold_100 and a Pony Fuel (SeasonPoint_1).
 const (
 	chestQuestDailySmall int32 = 127_000_061
 	chestQuestDailyMini  int32 = 127_000_062
 	chestQuestGold100    int32 = 127_000_269
+	chestSeasonPoint1    int32 = 127_000_178
 )
 
+var (
+	rewardSmall = []int32{chestQuestDailySmall}
+	rewardBig   = []int32{chestQuestGold100, chestSeasonPoint1}
+)
+
+// Quest kinds (0x3807a8).
 const (
-	questMetaUpgrade  int32 = 9
-	questWinRumble    int32 = 19
-	questPlayGameMode int32 = 26
+	questWinWithUnit      int32 = 1
+	questPlayWithUnit     int32 = 2
+	questMetaUpgrade      int32 = 9
+	questWinRumble        int32 = 19
+	questSeasonRoadLevel  int32 = 24
+	questResourceGained   int32 = 25
+	questPlayGameMode     int32 = 26
+	resourceRankPoints    int32 = 12 // resources.csv row of the trophies
+	resourceRankPointsKey       = "RankPoints"
 )
 
-// The pool has one quest more than a day hands out: the client rerolls a
-// quest by itself, picking at random among the pool's unused quests
-// (0x785fac), so with exactly one left over the server knows its pick.
-// Only quests the server can count from what it sees (battle results).
-var dailyQuests = []questDef{
-	{"PlayGameMode", questPlayGameMode, "TID_CHRONOS_QUESTS_PLAY_DUEL", 3,
-		[]int32{chestQuestDailyMini}, map[string]any{"GameMode": "2_PLAYER"}},
+// The quests a day can come from: only kinds the server can count from
+// what it sees (battle results, trophies, the road). The kinds, texts and
+// reward chests are the game's; the amounts are ours (docs/ROADMAP.md B5).
+var questCatalog = []questDef{
+	playDuels(3, rewardSmall),
+	playRumbles(2, rewardSmall),
+	{"PlayWithUnit", questPlayWithUnit, "TID_CHRONOS_QUESTS_PLAYWITHUNIT", 4,
+		rewardSmall, map[string]any{}},
+	{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINWITHUNIT", 2,
+		rewardSmall, map[string]any{"UseRoundWins": false}},
+	{"MetaSeasonRoadLevel", questSeasonRoadLevel, "TID_CHRONOS_QUESTS_SEASONPASSLEVELUP", 2,
+		rewardSmall, nil},
+	playDuels(5, rewardBig),
+	{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINWITHUNIT", 4,
+		rewardBig, map[string]any{"UseRoundWins": false}},
 	{"WinRumble", questWinRumble, "TID_CHRONOS_QUESTS_WINRUMBLE", 1,
-		[]int32{chestQuestDailySmall}, nil},
-	{"PlayGameMode", questPlayGameMode, "TID_CHRONOS_QUESTS_PLAY_RUMBLE", 2,
-		[]int32{chestQuestDailyMini}, map[string]any{"GameMode": "RUMBLE"}},
-	{"PlayGameMode", questPlayGameMode, "TID_CHRONOS_QUESTS_PLAY_DUEL", 5,
-		[]int32{chestQuestGold100}, map[string]any{"GameMode": "2_PLAYER"}},
+		rewardBig, nil},
+	{"MetaResourceGained", questResourceGained, "TID_CHRONOS_QUESTS_WINTROPHIES", 10,
+		rewardBig, map[string]any{"Resource": resourceRankPointsKey}},
 }
 
-// questsPerDay: how many of the pool a day hands out.
-const questsPerDay = 3
+func playDuels(n int32, rewards []int32) questDef {
+	return questDef{"PlayGameMode", questPlayGameMode, "TID_CHRONOS_QUESTS_PLAY_DUEL", n,
+		rewards, map[string]any{"GameMode": "2_PLAYER"}}
+}
+
+func playRumbles(n int32, rewards []int32) questDef {
+	return questDef{"PlayGameMode", questPlayGameMode, "TID_CHRONOS_QUESTS_PLAY_RUMBLE", n,
+		rewards, map[string]any{"GameMode": "RUMBLE"}}
+}
+
+// questPoolSize: the quests of a day's pool: a day's quests and one for
+// the reroll.
+const questPoolSize = questsPerDay + questRerollsPerDay
+
+// todaysQuests: today's pool (UTC day), seven of the catalog, the same all
+// day. The saved quests point into it by index.
+func todaysQuests() []questDef {
+	if len(questCatalog) <= questPoolSize {
+		return questCatalog
+	}
+	day := now().UTC().Unix() / 86400
+	rng := rand.New(rand.NewSource(day*104729 + 17))
+	var out []questDef
+	for _, i := range rng.Perm(len(questCatalog))[:questPoolSize] {
+		out = append(out, questCatalog[i])
+	}
+	return out
+}
+
+// A day: six daily quests, three at a time ("Quests completed: 0/6" and
+// three daily quests on the screenshots); a claimed one makes room for the
+// next.
+const (
+	questsPerDay     = 6
+	questsConcurrent = 3
+)
 
 func (q questDef) json() map[string]any {
 	m := map[string]any{
@@ -182,14 +236,14 @@ func LiveEvents() []LiveEvent {
 	start := int32(day.AddDate(0, 0, -1).Unix())
 	end := int32(day.AddDate(0, 0, 30).Unix())
 	var list []any
-	for _, q := range dailyQuests {
+	for _, q := range todaysQuests() {
 		list = append(list, q.json())
 	}
 	pool := map[string]any{
 		"Pool":             list,
 		"CycleCategory":    "Daily",
 		"DailyLimit":       questsPerDay,
-		"CycleLimit":       questsPerDay + 1,
+		"CycleLimit":       questPoolSize,
 		"PoolPriority":     1,
 		"DuplicateAllowed": false,
 		"LevelLimitLow":    0,
@@ -200,5 +254,5 @@ func LiveEvents() []LiveEvent {
 		ID: dailyPoolEvent, Name: "daily_quests", Type: EventQuestPool,
 		Start: start, End: end, VisibleStart: start, VisibleEnd: end,
 		Parameters: string(b),
-	}}
+	}, seasonLiveEvent(), shopLiveEvent()}
 }

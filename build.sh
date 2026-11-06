@@ -99,7 +99,8 @@ standalone)
     build_hook -DCMOFFLINE_NO_CRASH_LOGGER -DCMOFFLINE_LOCAL_SERVER "-DSERVER_KEY_HEX=\"$priv\"" \
         "-DCMSERVER_OPTIONS=\"progression=$opt tutorial=$TUTORIAL chests=$CHESTS live=$LIVE winfragments=$WIN_FRAGMENTS\""
     python3 "$ROOT/cmoffline/tools/patch_apk.py" "$apk" "$OUT/libcmoffline.so" \
-        "$OUT/unsigned.apk" "$pub" --add-lib "$OUT/libcmserver.so"
+        "$OUT/unsigned.apk" "$pub" --add-lib "$OUT/libcmserver.so" \
+        --help-page "$ROOT/cmoffline/help/help.html"
     sign "$OUT/unsigned.apk" "$OUT/clashmini-standalone.apk"
     ;;
 connect)
@@ -107,7 +108,7 @@ connect)
     pub=$(pubkey_of "${SERVER_KEY:-$PWD/cmserver/server.key}")
     build_hook -DCMOFFLINE_NO_CRASH_LOGGER
     python3 "$ROOT/cmoffline/tools/patch_apk.py" "$apk" "$OUT/libcmoffline.so" \
-        "$OUT/unsigned.apk" "$pub"
+        "$OUT/unsigned.apk" "$pub" --help-page "$ROOT/cmoffline/help/help.html"
     sign "$OUT/unsigned.apk" "$OUT/clashmini-connect.apk"
     echo "run the server with: cd cmserver && go run ."
     ;;

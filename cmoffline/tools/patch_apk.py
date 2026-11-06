@@ -11,18 +11,28 @@ What it changes in the APK:
            one extra NEEDED entry so Android loads libcmoffline.so with it
   ~ with server_pubkey_hex: sets libg's server key so it reconstructs to yours
   + with --add-lib: adds more libraries (the in-game server libcmserver.so)
+  ~ with --help-page: points "Help and Support" at our own page (the
+           HelpshiftURL and SelfhelpURL cells of assets/csv_client/locales.csv
+           become a data: URL of the page; its fingerprint.json entry follows)
   - drops  the old v1 signature files (you re-sign afterwards)
-Every Supercell file (classes*.dex, libg.so, assets, ...) is copied unchanged.
+Every other Supercell file (classes*.dex, libg.so, assets, ...) is copied
+unchanged.
 
 Needs: Python 3.8+, patchelf (Termux: pkg install patchelf, PC: pip install patchelf)
 """
 import argparse
+import csv
+import hashlib
+import io
+import json
+import lzma
 import os
 import shutil
 import struct
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 import zipfile
 
 LIB_DIR = "lib/arm64-v8a/"
@@ -50,6 +60,10 @@ SUPERCELL_K0 = bytes.fromhex(
 # (see RE.md). Constant for this build.
 SERVER_K1 = bytes.fromhex(
     "63137adaadb716d445fa4bddf76d5486ce10b4747a0f2c253ba0b0a33ba4e41d")
+
+LOCALES = "assets/csv_client/locales.csv"
+FINGERPRINT = "assets/fingerprint.json"
+HELP_COLUMNS = ("HelpshiftURL", "SelfhelpURL")
 
 SO_ALIGN = 16384   # uncompressed .so files: page aligned (works for 4K and 16K pages)
 ALIGN = 4          # other uncompressed files (resources.arsc etc.)
@@ -187,6 +201,55 @@ def patch_server_key(libg, key_hex):
     return libg[:SERVER_KEY_OFFSET] + k0 + libg[SERVER_KEY_OFFSET + 32:]
 
 
+# "Help and Support" without Helpshift (no HELPSHIFT_ENABLED from a server)
+# opens the in-game web view (0x733a1c -> 0x48be78 -> 0x4bc340) with the
+# locale's help URL (locales.csv) plus "?time=<seconds>". A data: URL needs
+# neither the network nor cleartext HTTP (blocked for targetSdk 30); the page
+# ends in an open comment so the appended "?time=..." stays invisible.
+def help_data_url(html):
+    page = html.strip() + "<!--"
+    return "data:text/html;charset=utf-8," + urllib.parse.quote(page, safe="")
+
+
+def sc_lzma_decode(b):
+    # Supercell's LZMA: 5 property bytes, a 4-byte size, the stream
+    return lzma.decompress(b[:9] + b"\0" * 4 + b[9:], format=lzma.FORMAT_ALONE)
+
+
+def sc_lzma_encode(data):
+    c = lzma.compress(data, format=lzma.FORMAT_ALONE, filters=[
+        {"id": lzma.FILTER_LZMA1, "dict_size": 1 << 18, "lc": 3, "lp": 0, "pb": 2}])
+    return c[:5] + struct.pack("<I", len(data)) + c[13:]
+
+
+def patch_locales(b, url):
+    text = sc_lzma_decode(b).decode("utf-8")
+    nl = "\r\n" if "\r\n" in text else "\n"
+    rows = list(csv.reader(io.StringIO(text)))
+    cols = [rows[0].index(c) for c in HELP_COLUMNS if c in rows[0]]
+    if not cols:
+        die("locales.csv has no help URL column")
+    out = io.StringIO()
+    w = csv.writer(out, lineterminator=nl)
+    for i, row in enumerate(rows):
+        if i >= 2 and row and row[0]:
+            for c in cols:
+                while len(row) <= c:
+                    row.append("")
+                row[c] = url
+        w.writerow(row)
+    return sc_lzma_encode(out.getvalue().encode("utf-8"))
+
+
+def patch_fingerprint(b, name, data):
+    fp = json.loads(b)
+    short = name[len("assets/"):]
+    for f in fp.get("files", []):
+        if f.get("file") == short:
+            f["sha"] = hashlib.sha1(data).hexdigest()
+    return json.dumps(fp, separators=(",", ":")).encode("utf-8")
+
+
 def main():
     ap = argparse.ArgumentParser(usage=__doc__)
     ap.add_argument("src")
@@ -195,6 +258,8 @@ def main():
     ap.add_argument("server_key", nargs="?")
     ap.add_argument("--add-lib", action="append", default=[], metavar="SO",
                     help="extra arm64 library to put into lib/arm64-v8a/")
+    ap.add_argument("--help-page", metavar="HTML",
+                    help="page that \"Help and Support\" shows instead of Supercell's")
     a = ap.parse_args()
     src, lib, dst, server_key = a.src, a.lib, a.dst, a.server_key
     if os.path.abspath(src) == os.path.abspath(dst):
@@ -218,6 +283,12 @@ def main():
                 die(f"the APK already contains {name}")
         sentry_info = zin.getinfo(SENTRY)
         new_sentry = add_needed(zin.read(SENTRY), tmp)
+        new_locales = new_fingerprint = None
+        if a.help_page:
+            with open(a.help_page, encoding="utf-8") as f:
+                url = help_data_url(f.read())
+            new_locales = patch_locales(zin.read(LOCALES), url)
+            new_fingerprint = patch_fingerprint(zin.read(FINGERPRINT), LOCALES, new_locales)
 
         with zipfile.ZipFile(dst, "w") as zout:
             for info in zin.infolist():
@@ -227,6 +298,10 @@ def main():
                     data = new_sentry
                 elif info.filename == LIBG and server_key:
                     data = patch_server_key(zin.read(info), server_key)
+                elif info.filename == LOCALES and new_locales:
+                    data = new_locales
+                elif info.filename == FINGERPRINT and new_fingerprint:
+                    data = new_fingerprint
                 else:
                     data = zin.read(info)
                 zout.writestr(aligned_info(zout, info, info.filename), data)

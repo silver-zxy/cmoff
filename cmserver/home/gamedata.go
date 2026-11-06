@@ -3,10 +3,13 @@ package home
 import (
 	"archive/zip"
 	"bufio"
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -62,6 +65,9 @@ type leagueData struct {
 type GameData struct {
 	leagues []leagueData
 	chests  []chestDef // by chest id - 127000000
+	// miniCost: a mini's elixir cost by seasonal row (characters.csv
+	// ManaCost of the row's Season1 character)
+	miniCost map[int32]int32
 }
 
 // chestBase: chest ids are 127000000 + their index in chests.json.
@@ -101,7 +107,87 @@ func LoadGameData(apk string) (*GameData, error) {
 	if err := read("assets/chests/chests.json", &c); err != nil {
 		return nil, fmt.Errorf("chests.json: %w", err)
 	}
-	return &GameData{leagues: l.Leagues, chests: c.Chests}, nil
+	d := &GameData{leagues: l.Leagues, chests: c.Chests}
+	// the tables below are optional: a stand-in APK may lack them
+	chars, err1 := readCSV(z, "assets/csv_logic/characters.csv")
+	seas, err2 := readCSV(z, "assets/csv_logic/seasonal_character_mapping.csv")
+	if err1 == nil && err2 == nil {
+		d.miniCost = miniCosts(chars, seas)
+	}
+	return d, nil
+}
+
+// csvTable is a csv_logic table: the header, then the rows after the
+// types row.
+type csvTable struct {
+	cols map[string]int
+	rows [][]string
+}
+
+func (t csvTable) get(row []string, col string) string {
+	i, ok := t.cols[col]
+	if !ok || i >= len(row) {
+		return ""
+	}
+	return row[i]
+}
+
+// readCSV reads a csv_logic table from the APK (LZMA compressed,
+// sclzma.go).
+func readCSV(z *zip.ReadCloser, name string) (csvTable, error) {
+	f, err := z.Open(name)
+	if err != nil {
+		return csvTable{}, err
+	}
+	defer f.Close()
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return csvTable{}, err
+	}
+	if b, err = scDecompress(b); err != nil {
+		return csvTable{}, fmt.Errorf("%s: %w", name, err)
+	}
+	r := csv.NewReader(bytes.NewReader(b))
+	r.FieldsPerRecord = -1
+	r.LazyQuotes = true
+	all, err := r.ReadAll()
+	if err != nil {
+		return csvTable{}, fmt.Errorf("%s: %w", name, err)
+	}
+	if len(all) < 2 {
+		return csvTable{}, fmt.Errorf("%s: no rows", name)
+	}
+	t := csvTable{cols: map[string]int{}, rows: all[2:]}
+	for i, c := range all[0] {
+		t.cols[strings.TrimSpace(c)] = i
+	}
+	return t, nil
+}
+
+// miniCosts: the elixir cost of every seasonal row that maps to a
+// character.
+func miniCosts(chars, seas csvTable) map[int32]int32 {
+	cost := map[string]int32{}
+	for _, r := range chars.rows {
+		if n, err := strconv.Atoi(chars.get(r, "ManaCost")); err == nil {
+			cost[chars.get(r, "Name")] = int32(n)
+		}
+	}
+	out := map[int32]int32{}
+	for i, r := range seas.rows {
+		if c, ok := cost[seas.get(r, "Season1")]; ok {
+			out[int32(i)] = c
+		}
+	}
+	return out
+}
+
+// MiniCost: a mini's elixir cost by seasonal row (0 if unknown).
+func (d *GameData) MiniCost(seasonalRow int32) int32 {
+	if d == nil {
+		return 0
+	}
+	return d.miniCost[seasonalRow]
 }
 
 // FindOwnAPK returns the APK this process runs from (/proc/self/maps), for

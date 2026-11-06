@@ -69,10 +69,13 @@ func decode(body []byte) (ownHomeData, error) {
 	// the rest starts with a bool, which shares the byte with the last
 	// event's bool
 	if len(m.home.events) == 0 {
-		r.Skip(fixedLen(encodeHomeHeadRest))
-	} else {
-		r.Skip(fixedLen(encodeHomeHeadRest) - 1)
+		r.Skip(1)
 	}
+	// the shop purchases, then the rest (its empty form: bool, VInt 0, …)
+	for n := r.VInt(); n > 0 && r.Err() == nil; n-- {
+		m.home.purchases = append(m.home.purchases, Purchase{r.VInt(), r.VInt()})
+	}
+	r.Skip(fixedLen(func(w *proto.Writer) { encodeHomeHeadRest(w, nil) }) - 2)
 	d := &m.home.daily
 	d.weekday, d.day, d.unknownC0 = r.VInt(), r.VInt(), r.VInt()
 	d.ticksLeft = r.VInt()
@@ -96,14 +99,16 @@ func decode(body []byte) (ownHomeData, error) {
 			}
 		}
 	}
-	r.Skip(fixedLen(func(w *proto.Writer) { encodeHomeEnd(w, false, nil) }))
+	// up to the season manager (its empty form is four VInt 0)
+	r.Skip(fixedLen(func(w *proto.Writer) { encodeHomeEnd(w, false, nil, nil) }) - 4)
+	m.home.season = decodeSeason(r)
 	m.home.chests = decodeChests(r)
 	// The manager's bool and the bool after it share a byte, with the last
 	// chest's last bool when there are chests.
 	if len(m.home.chests) == 0 {
-		r.Skip(fixedLen(func(w *proto.Writer) { w.Bool(false); encodeHomeEnd2(w) }))
+		r.Skip(fixedLen(func(w *proto.Writer) { w.Bool(false); encodeHomeEnd2(w, 0) }))
 	} else {
-		r.Skip(fixedLen(encodeHomeEnd2) - 1)
+		r.Skip(fixedLen(func(w *proto.Writer) { encodeHomeEnd2(w, 0) }) - 1)
 	}
 
 	m.avatar.accountID[0], m.avatar.accountID[1] = r.VLong()
@@ -268,7 +273,7 @@ func decodeChests(r *proto.Reader) []PendingChest {
 		r.Bool()
 		r.Bool()
 		r.Bool()
-		list()
+		c.List = list()
 		c.Chest = r.VInt()
 		c.Index = r.VInt()
 		c.SourceValue = r.VInt()
@@ -311,6 +316,41 @@ func decodeChests(r *proto.Reader) []PendingChest {
 }
 
 // decodeQuests mirrors encodeQuests (the client's 0x4bccd8 / 0x3b3af4).
+// decodeSeason reads the season manager (decoder 0x4bb660); nil when
+// empty.
+func decodeSeason(r *proto.Reader) *SeasonState {
+	cur := r.VInt()
+	r.VInt()
+	r.VInt()
+	n := r.VInt()
+	var out *SeasonState
+	for ; n > 0 && r.Err() == nil; n-- {
+		if ev := r.VInt(); ev != seasonEvent {
+			panic("season entry for another event")
+		}
+		key := r.VInt()
+		if !r.Bool() {
+			continue
+		}
+		r.VInt()
+		s := &SeasonState{Key: key, Points: r.VInt()}
+		if !r.Bool() {
+			panic("the pass is everyone's")
+		}
+		s.Claimed = r.VInt()
+		s.PaidClaimed = r.VInt()
+		for i := 0; i < 3; i++ {
+			if k := r.VInt(); k != 0 {
+				panic("season lists not empty")
+			}
+		}
+		if key == cur {
+			out = s
+		}
+	}
+	return out
+}
+
 // lastPoolState: the pool state decodeQuests read last (event, handed
 // out, taken indices...).
 var lastPoolState []int32
@@ -333,7 +373,10 @@ func decodeQuests(r *proto.Reader) []Quest {
 			case questMetaUpgrade:
 				r.Bool()
 				r.Bool()
-			case questPlayGameMode:
+			case questPlayGameMode, questPlayWithUnit, questResourceGained:
+				r.VInt()
+			case questWinWithUnit:
+				r.Bool()
 				r.VInt()
 			}
 		}
