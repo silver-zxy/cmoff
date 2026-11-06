@@ -16,11 +16,11 @@ import (
 // rows of characters.csv, then the 14 of characters_heroes.csv (the hook
 // logged 69 items, rows 0..), so a mini is its characters.csv row + 1.
 
-// miniQuestsOn: off for now. With them on, one won match finished the
-// three "win 1" quests and the home's quest button showed 3 done, but the
-// quest screen had none of them (0077 on the phone): the screen does not
-// show our chain yet. Until it does they stay out of the home.
-var miniQuestsOn = false
+// miniQuestsOn: the quest screen lists only quests not yet ended
+// (0x753e88: +0x1c end time > now), the button's count does not look at
+// that; with end time 0 (until 0079) the button showed 3 done mini quests
+// the screen did not list. With the end time they are on again.
+var miniQuestsOn = true
 
 // miniChainEvent: the chronos event of the mini quest chain.
 const miniChainEvent int32 = 1002

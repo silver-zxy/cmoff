@@ -19,8 +19,7 @@ func miniData() *GameData {
 // match counts for the deck's minis; a claim moves the mini on.
 func TestMiniQuests(t *testing.T) {
 	Data = miniData()
-	miniQuestsOn = true
-	defer func() { Data, miniQuestsOn = nil, false }()
+	defer func() { Data = nil }()
 	a := NewAccount()
 	a.StartProgression()
 	a.Decks[a.Selected] = [5]int32{4, 0, 1, 5, 6}
