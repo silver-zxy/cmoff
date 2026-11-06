@@ -270,10 +270,16 @@ Fifth test: still the old quest again, without rewards. Two causes:
   manager +0x180, list +0x30 / count +0x3c, quest id +0x38, progress +0x3c)
   and sends them (result frame mode 11: count, then int32 id / progress
   pairs); the server takes the higher value (`QuestsFromClient`, 0076).
-  On the phone (0077) the battle's quest manager had none: the offline
-  battle's client counts nothing. So the hook reads the rounds itself and
-  sends them with the result (0078, `BattleRounds`): win N rounds, 3:0.
-  The other battle kinds are out of the pool until the hook reads them.
+  The battle does not count on the home's quests but on copies: at its
+  start (0x940898) the client takes the home's active quests that count in
+  battle (handler +0x68), are not done and have not ended (0x4f6854:
+  quest +0x1c, the end time in unix seconds, > now) and clones them into
+  a list per player (battle +0x238 + 8 * player, set by 0x32c3c4; array
+  +0x0, count +0xc). The events count on those (knock outs 0x5c59cc ->
+  0x4f28b0, the kind's handler +0x88). With +0x1c 0 (until 0079) the lists
+  stayed empty; now +0x1c is the daily reset, and the hook reads the
+  battle's list (0079). The hook also sends the rounds with the result
+  (0078, `BattleRounds`).
 - Battle kinds in the pool (0076): win 9 rounds (WinWithUnit with
   UseRoundWins, not counted by the server), knock out 15 (TotalKOs), win
   without rerolling (20), win rounds without losing a mini (21), 3:0 in a

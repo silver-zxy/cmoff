@@ -3,6 +3,7 @@ package home
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"cmserver/proto"
 )
@@ -317,6 +318,15 @@ func intList(w *proto.Writer, xs []int32) {
 
 // encodeQuests writes the home's quest manager with the active quests
 // (claimed ones are left out).
+// questsEnd: when today's quests end, the next daily reset.
+func questsEnd(d dailyGold) int32 {
+	if d.ticksLeft > 0 {
+		return int32(now().Unix()) + d.ticksLeft/20
+	}
+	y, m, dd := now().UTC().Date()
+	return int32(time.Date(y, m, dd+1, 0, 0, 0, 0, time.UTC).Unix())
+}
+
 func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 	quests := s.quests
 	done := int32(0)
@@ -383,7 +393,10 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 		intList(w, def.Rewards)
 		w.String("") // +0x58
 		w.VInt(0)    // +0x18
-		w.VInt(0)    // +0x1c
+		// +0x1c: the end time (unix seconds, as the events'). A battle
+		// copies only the quests not yet ended (0x4f6854: +0x1c > now), so
+		// with 0 the battle had none and counted nothing.
+		w.VInt(questsEnd(d))
 	}
 	// the pools' state (+0x0 event, +0x10 handed out, +0x20 the taken
 	// indices; encoder 0x31b864): a reroll (0x785fac) takes one back and

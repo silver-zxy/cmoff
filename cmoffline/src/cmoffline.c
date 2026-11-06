@@ -637,11 +637,47 @@ static void remember_quests(uint8_t *gm) {
     }
 }
 
-static void report_quests(uint8_t *gm) {
-    uint8_t *qm = quests_of(gm);
-    if (!qm) qm = home_quests;
-    uint8_t *list = peek_ptr(qm, QUESTS_ACTIVE);
-    int n = peek_int(qm, QUESTS_ACTIVE_N, -1);
+/* The battle's own quests: at its start the client copies the home's
+ * active quests that count in battle and have not expired (0x940898 ->
+ * 0x4f6854, quest +0x1c end time > now) into a list per player, battle
+ * +0x238 + 8 * player (0x32c3c4; a list: array +0x0, count +0xc). The
+ * battle's events count on these copies (knock outs 0x5c59cc -> 0x4f28b0,
+ * ...), so at the end their progress is the client's. */
+#define BATTLE_QUESTS       0x238
+#define LIST_ITEMS          0x0
+#define LIST_N              0xc
+
+static int battle_quests(uint8_t *b, uint8_t **list, int *count) {
+    int n = peek_int(b, BATTLE_PLAYER_N, 0), me = -1;
+    if (!b || n < 1 || n > 8) return 0;
+    for (int i = 0; i < n && me < 0; i++)
+        if (peek_int(peek_ptr(b, BATTLE_PLAYERS + i * 8), 0, -1) >= 0) me = i;
+    int pick = -1;
+    char line[160];
+    int ll = 0;
+    for (int i = 0; i < n; i++) {
+        uint8_t *l = peek_ptr(b, BATTLE_QUESTS + i * 8);
+        int c = l ? peek_int(l, LIST_N, -1) : -1;
+        if (ll < (int)sizeof line - 16) ll += snprintf(line + ll, sizeof line - ll, " %d:%d", i, c);
+        if (c > 0 && c <= 64 && peek_ptr(l, LIST_ITEMS) && (pick < 0 || i == me)) pick = i;
+    }
+    LOG("quests: battle lists (player: count)%s, ours %d", ll ? line : " none", me);
+    if (pick < 0) return 0;
+    uint8_t *l = peek_ptr(b, BATTLE_QUESTS + pick * 8);
+    *list = peek_ptr(l, LIST_ITEMS);
+    *count = peek_int(l, LIST_N, 0);
+    return 1;
+}
+
+static void report_quests(uint8_t *gm, uint8_t *b) {
+    uint8_t *list = NULL;
+    int n = -1;
+    if (!battle_quests(b, &list, &n)) {
+        uint8_t *qm = quests_of(gm);
+        if (!qm) qm = home_quests;
+        list = peek_ptr(qm, QUESTS_ACTIVE);
+        n = peek_int(qm, QUESTS_ACTIVE_N, -1);
+    }
     if (!list || n < 0 || n > 64) { LOG("quests: not readable (%d)", n); return; }
     uint8_t f[7 + 2 + QUESTS_MAX * 8];
     int len = 2, k = 0;
@@ -726,7 +762,8 @@ static void watch_result(uint8_t *gm, int state) {
     if (rounds_won >= 0)
         extra = 0x8000 | ((rounds_lost >= 0 ? rounds_lost : 0x7f) & 0x7f) << 8 | (rounds_won & 0xff);
     report_result_ex(battle_mode, place, extra);
-    report_quests(gm);
+    report_quests(gm, peek_ptr(peek_ptr(peek_ptr(screen, SCREEN_LOGIC_OWNER), LOGIC_BATTLE_OWNER),
+                               LOGIC_BATTLE));
 }
 
 /* Tutorial (a new player's, signalled by the server with mode 1). The

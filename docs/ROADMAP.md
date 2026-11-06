@@ -75,12 +75,13 @@ Done in 0065 (to test):
   crashed the quest screen and is out, 0075).
 
 Still to do:
-- Battle kinds: the client does not count them offline (the battle's
-  quest manager is empty, 0077 on the phone). The hook reads each
-  player's rounds won at the battle's end and sends them with the result
-  (0078): "win 9 rounds" and "3:0 in a duel" count on the server. Still
-  out until the hook can read them: knock out N, win without rerolling,
-  rounds without losing a mini, Clash, upgrades in battle.
+- Battle kinds (0079, to test): a battle copies the home's quests that
+  have not ended (+0x1c end time > now); we sent 0, so the battle had none
+  and counted nothing. Now the quests carry the daily reset as their end;
+  the client counts knock outs, rounds, no reroll, rounds without a loss,
+  3:0, Clash and upgrades on the battle's copies (battle +0x238 per
+  player) and the hook reports them after the battle. Rounds and 3:0 the
+  server also counts from the hook's rounds (0078).
 - Mini quests (0077): built, but off (0078). One win finished the three
   "win 1" quests and the home's quest button showed 3 done, yet the quest
   screen had none: it does not show our chain yet. To find: how the
