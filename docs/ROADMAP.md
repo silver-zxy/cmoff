@@ -75,12 +75,16 @@ Done in 0065 (to test):
   crashed the quest screen and is out, 0075).
 
 Still to do:
-- Battle kinds (win N rounds, knock out N, win without rerolling, 3:0,
-  rounds without losing a mini, Clash, upgrades in battle): the client
-  counts them, the hook reports its progress after each battle (0076, to
-  test).
-- Mini quests (0077, to test): win 1, 3, 5 matches using each owned
-  mini, three at a time, quest_Daily_Mini; category 3 (MINI QUESTS).
+- Battle kinds: the client does not count them offline (the battle's
+  quest manager is empty, 0077 on the phone). The hook reads each
+  player's rounds won at the battle's end and sends them with the result
+  (0078): "win 9 rounds" and "3:0 in a duel" count on the server. Still
+  out until the hook can read them: knock out N, win without rerolling,
+  rounds without losing a mini, Clash, upgrades in battle.
+- Mini quests (0077): built, but off (0078). One win finished the three
+  "win 1" quests and the home's quest button showed 3 done, yet the quest
+  screen had none: it does not show our chain yet. To find: how the
+  screen lists the MINI QUESTS (category 3).
 - Clashmas quests: the quest group (event type 6) with the Candy Elf
   (shop_skin_SpearGoblinElf, icon_xmas_quest); the 6 known:
 

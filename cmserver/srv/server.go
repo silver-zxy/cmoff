@@ -368,6 +368,15 @@ func (s *Server) handleResult(p []byte) {
 		return
 	}
 	s.acc.Lock()
+	// extra: 0x8000 | rounds lost << 8 | rounds won (0x7f lost: unknown)
+	if extra&0x8000 != 0 && place != 0 {
+		wonR, lost := extra&0xff, extra>>8&0x7f
+		if lost == 0x7f {
+			lost = -1
+		}
+		s.acc.BattleRounds(mode, place, wonR, lost)
+		log.Printf("battle rounds: won %d, lost %d", wonR, lost)
+	}
 	o := s.acc.BattleResult(mode, place, b.ranked)
 	trophies, st := s.acc.Trophies, s.acc.Stats
 	s.acc.Unlock()

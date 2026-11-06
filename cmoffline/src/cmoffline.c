@@ -543,6 +543,12 @@ static int32_t peek_int(const uint8_t *base, size_t off, int32_t fallback) {
     return base && !peek(base + off, &v, sizeof v) ? v : fallback;
 }
 
+/* Rounds of the last battle read, for the quests ("win N rounds", 3:0):
+ * ours and, in a duel, the opponent's (each player's state +0x178). The
+ * client counts such quests only in its own home, not in the offline
+ * battle's, so the server needs them. -1 = unknown. */
+static int rounds_won = -1, rounds_lost = -1;
+
 /* Our place: duel 1 won / 2 lost; Rumble 1, 2, 3 (3rd-4th), 5 (5th-8th).
  * 0 if the battle cannot be read. */
 static int read_place(int mode, uint8_t *screen) {
@@ -554,11 +560,16 @@ static int read_place(int mode, uint8_t *screen) {
         if (peek_int(peek_ptr(b, BATTLE_PLAYERS + i * 8), 0, -1) >= 0) me = i;
     uint8_t *st = me < 0 ? NULL : peek_ptr(b, BATTLE_STATES + me * 8);
     if (!st) return 0;
+    rounds_won = peek_int(st, STATE_WINS, -1);
+    rounds_lost = -1;
+    if (mode != 3 && n == 2)
+        rounds_lost = peek_int(peek_ptr(b, BATTLE_STATES + (1 - me) * 8), STATE_WINS, -1);
     if (mode != 3) {
         int wins = peek_int(st, STATE_WINS, -1);
         int needed = peek_int(peek_ptr(b, BATTLE_RULES), RULES_WINS_NEEDED, -1);
         if (wins < 0 || needed <= 0) return 0;
-        LOG("battle result: duel %s (rounds won %d of %d)", wins >= needed ? "won" : "lost", wins, needed);
+        LOG("battle result: duel %s (rounds won %d of %d, lost %d)", wins >= needed ? "won" : "lost",
+            wins, needed, rounds_lost);
         return wins >= needed ? 1 : 2;
     }
     int out = peek_int(st, STATE_OUT_STAGE, -2);
@@ -710,7 +721,11 @@ static void watch_result(uint8_t *gm, int state) {
     int place = read_place(battle_mode, screen);
     if (!place) return;
     reported = 1;
-    report_result(battle_mode, place);
+    /* extra: 0x8000 | rounds lost (duel, 0x7f unknown) << 8 | rounds won */
+    int extra = 0;
+    if (rounds_won >= 0)
+        extra = 0x8000 | ((rounds_lost >= 0 ? rounds_lost : 0x7f) & 0x7f) << 8 | (rounds_won & 0xff);
+    report_result_ex(battle_mode, place, extra);
     report_quests(gm);
 }
 

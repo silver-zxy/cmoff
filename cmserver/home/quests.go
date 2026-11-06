@@ -209,6 +209,22 @@ func (a *Account) questsAfterBattle(mode, place int32) {
 	}
 }
 
+// BattleRounds counts the rounds the hook read from a finished battle:
+// rounds won for "win N rounds", a duel won without a round lost for 3:0
+// (WinDuelPerfect). lost < 0: not known. The caller holds the lock.
+func (a *Account) BattleRounds(mode, place, wonRounds, lost int32) {
+	a.refreshQuests()
+	if wonRounds > 0 {
+		a.questProgress(questWinWithUnit, wonRounds, func(d questDef) bool {
+			r, _ := d.Own["UseRoundWins"].(bool)
+			return r
+		})
+	}
+	if mode == ModeDuel && place == 1 && lost == 0 {
+		a.questProgress(questWinDuelPerfect, 1, nil)
+	}
+}
+
 // QuestsFromClient takes the progress the client counted itself (the hook
 // reads it after a battle: battle kinds such as knock outs, rounds or 3:0
 // only the client sees). A quest only goes up, to its target at most. The
@@ -342,7 +358,7 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 	}
 	chain := miniChain()
 	for _, q := range s.mini {
-		if !q.Claimed && int(q.Index) < len(chain) {
+		if miniQuestsOn && !q.Claimed && int(q.Index) < len(chain) {
 			list = append(list, shown{q, chain[q.Index], miniChainEvent, questCategoryMini})
 		}
 	}

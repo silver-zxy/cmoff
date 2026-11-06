@@ -31,7 +31,7 @@ func LiveGlobals() []string {
 		"ID": "QUEST_SETTINGS",
 		"Params": map[string]any{
 			"Enabled":                   true,
-			"MaxConcurrentQuests":       questsConcurrent + miniQuestsShown,
+			"MaxConcurrentQuests":       questsConcurrent + miniQuestsShown, // room for them when on
 			"MaxConcurrentDailyQuests":  questsConcurrent,
 			"MaxTotalDailyQuests":       questsPerDay,
 			"DailyQuestRerollLimit":     questRerollsPerDay,
@@ -172,24 +172,15 @@ var questCatalog = []questDef{
 		rewardBig, map[string]any{"UseRoundWins": false}},
 	{"WinRumble", questWinRumble, "TID_CHRONOS_QUESTS_WINRUMBLE", 1,
 		rewardBig, nil},
-	// Battle kinds: the client counts them (LogicQuest*EventHandler), the
-	// hook reports its progress after the battle (QuestsFromClient). The
-	// ones on the screenshots: win 9 rounds (100 gold), knock out 15 (10-30),
-	// win 1 match without rerolling (10-30).
+	// Battle kinds the hook reads from the battle (BattleRounds): win 9
+	// rounds (100 gold, on the screenshots) and 3:0 in a duel. The client
+	// counts none of them offline (its battle's quest manager is empty), so
+	// knock outs, no reroll, rounds without a loss, Clash and upgrades in
+	// battle wait until the hook can read them.
 	{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINROUNDSWITHUNIT", 9,
 		rewardBig, map[string]any{"UseRoundWins": true}},
-	{"TotalKOs", questTotalKOs, "TID_CHRONOS_QUESTS_TOTALKOS", 15,
-		rewardSmall, map[string]any{}},
-	{"WinGameNoReroll", questWinGameNoReroll, "TID_CHRONOS_QUESTS_WINGAMENOREROLL", 1,
-		rewardSmall, nil},
-	{"WinRoundNoDeath", questWinRoundNoDeath, "TID_CHRONOS_QUESTS_WINROUNDNODEATH", 2,
-		rewardSmall, nil},
 	{"WinDuelPerfect", questWinDuelPerfect, "TID_CHRONOS_QUESTS_WINDUELPERFECT", 1,
 		rewardBig, nil},
-	{"UseKeywordClash", questKeywordClash, "TID_CHRONOS_QUESTS_USEKEYWORDCLASH", 10,
-		rewardSmall, map[string]any{}},
-	{"UpgradeUnit", questUpgradeUnit, "TID_CHRONOS_QUESTS_UPGRADEUNIT", 5,
-		rewardSmall, map[string]any{}},
 	// Not "Win N Trophies" (MetaResourceGained): a quest of that kind the
 	// client made from the pool crashed the quest screen (its hint,
 	// 0x834d64, found no resource), 0075.
@@ -299,7 +290,7 @@ func LiveEvents() []LiveEvent {
 		Start: start, End: end, VisibleStart: start, VisibleEnd: end,
 		Parameters: string(b),
 	}, seasonLiveEvent(), shopLiveEvent()}
-	if len(miniChain()) > 0 {
+	if miniQuestsOn && len(miniChain()) > 0 {
 		events = append(events, miniChainLiveEvent())
 	}
 	return events

@@ -16,6 +16,12 @@ import (
 // rows of characters.csv, then the 14 of characters_heroes.csv (the hook
 // logged 69 items, rows 0..), so a mini is its characters.csv row + 1.
 
+// miniQuestsOn: off for now. With them on, one won match finished the
+// three "win 1" quests and the home's quest button showed 3 done, but the
+// quest screen had none of them (0077 on the phone): the screen does not
+// show our chain yet. Until it does they stay out of the home.
+var miniQuestsOn = false
+
 // miniChainEvent: the chronos event of the mini quest chain.
 const miniChainEvent int32 = 1002
 
@@ -70,7 +76,7 @@ func miniChainLiveEvent() LiveEvent {
 // refreshMiniQuests hands out the next step of owned minis until three are
 // open: the selected deck's minis first, then by characters.csv row.
 func (a *Account) refreshMiniQuests() {
-	if !Live || !a.Progression || len(miniChain()) == 0 {
+	if !miniQuestsOn || !Live || !a.Progression || len(miniChain()) == 0 {
 		return
 	}
 	keep := a.MiniQuests[:0]

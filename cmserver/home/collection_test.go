@@ -428,3 +428,30 @@ func TestQuestsFromClient(t *testing.T) {
 		t.Fatalf("%v %+v", err, m.home.quests.quests)
 	}
 }
+
+// Rounds the hook read: won rounds count for "win N rounds", a duel won
+// 3:0 for WinDuelPerfect; a lost round or an unknown count (-1) does not.
+func TestBattleRounds(t *testing.T) {
+	catalog := questCatalog
+	defer func() { questCatalog = catalog }()
+	rounds := questDef{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINROUNDSWITHUNIT", 9, rewardBig, map[string]any{"UseRoundWins": true}}
+	win := questDef{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINWITHUNIT", 2, rewardSmall, map[string]any{"UseRoundWins": false}}
+	perfect := questDef{"WinDuelPerfect", questWinDuelPerfect, "TID_CHRONOS_QUESTS_WINDUELPERFECT", 1, rewardBig, nil}
+	questCatalog = []questDef{rounds, win, perfect, playDuels(3, rewardSmall), playDuels(5, rewardBig), playRumbles(2, rewardSmall), playRumbles(3, rewardBig)}
+	day := time.Date(2026, 11, 4, 12, 0, 0, 0, time.Local)
+	now = func() time.Time { return day }
+	defer func() { now = time.Now }()
+	a := NewAccount()
+	a.StartProgression()
+	a.refreshQuests()
+	a.BattleRounds(ModeDuel, 1, 3, 1) // won 3:1
+	a.BattleRounds(ModeDuel, 1, 3, -1)
+	a.BattleRounds(ModeDuel, 2, 2, 3)
+	if a.Quests[0].Progress != 8 || a.Quests[1].Progress != 0 || a.Quests[2].Progress != 0 {
+		t.Fatalf("progress %+v", a.Quests)
+	}
+	a.BattleRounds(ModeDuel, 1, 3, 0) // 3:0
+	if a.Quests[0].Progress != 9 || a.Quests[2].Progress != 1 {
+		t.Fatalf("progress %+v", a.Quests)
+	}
+}

@@ -156,7 +156,10 @@ connection of its own, one plain frame:
     id 19999 (not a game message), length 2, version 0, body: u8 mode, u8 place
 
 `place`: duel 1 = won, 2 = lost; Rumble 1, 2, 3 (3rd–4th), 5 (5th–8th);
-0 = left before the end (worst place). After it the hook sends a second
+0 = left before the end (worst place). A battle's result frame has length
+4: two more bytes, `0x8000 | rounds lost << 8 | rounds won` (each player's
+state +0x178; rounds lost only in a duel, 0x7f = unknown), for the round
+quests (0078). After it the hook sends a second
 frame, mode 11: count, then (int32 quest id, int32 progress) pairs, the
 client's own quest progress (big-endian). The server applies it to the battle
 it started last. Ranked battles (StartMatchmake's ranked bool) get the rank
