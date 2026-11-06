@@ -3,6 +3,7 @@ package home
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"cmserver/proto"
 )
@@ -39,12 +40,13 @@ type Quest struct {
 }
 
 const (
+	questCategoryMini  int32 = 3 // "Tutorial", the quest screen's MINI QUESTS (0x71d454)
 	questCategoryDaily int32 = 2
 	sourceQuest        int32 = 2
 )
 
 // refreshQuests: today's quests, new ones when the day changed, and the
-// next ones while fewer than three are open.
+// next ones while fewer than questsConcurrent are open.
 func (a *Account) refreshQuests() {
 	if !Live {
 		return
@@ -66,7 +68,7 @@ func (a *Account) refreshQuests() {
 // questRerollIndex: the pool index kept for the reroll (the pool's last).
 const questRerollIndex = questPoolSize - 1
 
-// topUpQuests hands out the pool's next quests while fewer than three are
+// topUpQuests hands out the pool's next quests while fewer than questsConcurrent are
 // open and fewer than six were handed out today. The next is the lowest
 // index not handed out, not rerolled away, and not the reroll's.
 func (a *Account) topUpQuests() {
@@ -195,11 +197,68 @@ func (a *Account) questsAfterBattle(mode, place int32) {
 	})
 	a.questProgress(questPlayWithUnit, 1, nil)
 	if won(mode, place) {
-		a.questProgress(questWinWithUnit, 1, nil)
+		a.questProgress(questWinWithUnit, 1, func(d questDef) bool {
+			r, _ := d.Own["UseRoundWins"].(bool)
+			return !r // rounds: the client counts them
+		})
+	}
+	if won(mode, place) {
+		a.miniQuestsWon()
 	}
 	if mode == ModeRumble && place == 1 { // "Finish as the Champion"
 		a.questProgress(questWinRumble, 1, nil)
 	}
+}
+
+// BattleRounds counts the rounds the hook read from a finished battle:
+// rounds won for "win N rounds", a duel won without a round lost for 3:0
+// (WinDuelPerfect). lost < 0: not known. The caller holds the lock.
+func (a *Account) BattleRounds(mode, place, wonRounds, lost int32) {
+	a.refreshQuests()
+	if wonRounds > 0 {
+		a.questProgress(questWinWithUnit, wonRounds, func(d questDef) bool {
+			r, _ := d.Own["UseRoundWins"].(bool)
+			return r
+		})
+	}
+	if mode == ModeDuel && place == 1 && lost == 0 {
+		a.questProgress(questWinDuelPerfect, 1, nil)
+	}
+}
+
+// QuestsFromClient takes the progress the client counted itself (the hook
+// reads it after a battle: battle kinds such as knock outs, rounds or 3:0
+// only the client sees). A quest only goes up, to its target at most. The
+// caller holds the lock. It returns what changed, for the log.
+func (a *Account) QuestsFromClient(progress [][2]int32) (changed []string) {
+	a.refreshQuests()
+	pool := todaysQuests()
+	chain := miniChain()
+	for _, p := range progress {
+		for i := range a.MiniQuests {
+			q := &a.MiniQuests[i]
+			if q.ID != p[0] || q.Claimed || int(q.Index) >= len(chain) {
+				continue
+			}
+			d := chain[q.Index]
+			if v := min(p[1], d.Target); v > q.Progress {
+				q.Progress = v
+				changed = append(changed, fmt.Sprintf("#%d mini %d/%d", q.ID, v, d.Target))
+			}
+		}
+		for i := range a.Quests {
+			q := &a.Quests[i]
+			if q.ID != p[0] || q.Claimed || int(q.Index) >= len(pool) {
+				continue
+			}
+			d := pool[q.Index]
+			if v := min(p[1], d.Target); v > q.Progress {
+				q.Progress = v
+				changed = append(changed, fmt.Sprintf("#%d %s %d/%d", q.ID, d.Kind, v, d.Target))
+			}
+		}
+	}
+	return changed
 }
 
 // questsTrophies: trophies won count for "Win N Trophies".
@@ -221,6 +280,9 @@ func (a *Account) questsRoadTiers(n int32) {
 
 // ClaimQuest is 503: the quest's reward chest, made by the client.
 func (a *Account) ClaimQuest(r *Reward, id int32) bool {
+	if a.claimMiniQuest(r, id) {
+		return true
+	}
 	a.refreshQuests()
 	pool := todaysQuests()
 	for i := range a.Quests {
@@ -256,6 +318,15 @@ func intList(w *proto.Writer, xs []int32) {
 
 // encodeQuests writes the home's quest manager with the active quests
 // (claimed ones are left out).
+// questsEnd: when today's quests end, the next daily reset.
+func questsEnd(d dailyGold) int32 {
+	if d.ticksLeft > 0 {
+		return int32(now().Unix()) + d.ticksLeft/20
+	}
+	y, m, dd := now().UTC().Date()
+	return int32(time.Date(y, m, dd+1, 0, 0, 0, 0, time.UTC).Unix())
+}
+
 func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 	quests := s.quests
 	done := int32(0)
@@ -284,29 +355,20 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 			active = append(active, q)
 		}
 	}
-	w.VInt(int32(len(active)))
 	pool := todaysQuests()
+	type shown struct {
+		q        Quest
+		def      questDef
+		event    int32
+		category int32
+	}
+	var list []shown
 	for _, q := range active {
-		def := pool[q.Index]
-		w.VInt(dailyPoolEvent)
-		w.VInt(q.Index)
-		w.VInt(def.TypeID)
-		// the kind's state (0x506b4c makes it by kind; its vtable+0x18
-		// writes it): MetaUpgrade two bools (0xea0478), WinRumble nothing
-		// (0xeb3fe0), PlayGameMode the mode, 2_PLAYER 2 / RUMBLE 3
-		// (0xec3568, 0x86517c)
-		w.Bool(true)
-		def.encodeState(w)
-		w.String(def.Text)
-		w.VInt(q.ID)
-		w.VInt(q.Progress)
-		w.VInt(def.Target)
-		w.VInt(0) // +0x30
-		w.VInt(questCategoryDaily)
-		intList(w, def.Rewards)
-		w.String("") // +0x58
-		w.VInt(0)    // +0x18
-		w.VInt(0)    // +0x1c
+		list = append(list, shown{q, pool[q.Index], dailyPoolEvent, questCategoryDaily})
+	}
+	w.VInt(int32(len(list)))
+	for _, e := range list {
+		writeQuest(w, e.q, e.def, e.event, e.q.Index, e.category, questsEnd(d))
 	}
 	// the pools' state (+0x0 event, +0x10 handed out, +0x20 the taken
 	// indices; encoder 0x31b864): a reroll (0x785fac) takes one back and
@@ -320,7 +382,54 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 	} else {
 		w.VInt(0)
 	}
-	vints(w, 3) // the other lists
+	// the chains' state (+0x40 a LogicLong per chain: its event id, ours
+	// the step; +0x50 the chain's current quest or none; encoder 0x31b91c,
+	// decoder 0x4bd2d8). The quest screen shows a chain's quest from here
+	// (0x7a3250 looks the chain's event up by the key's id), not from the
+	// active list: mini quests there showed in the quest button's count
+	// but not on the screen.
+	chain := miniChain()
+	var open []Quest
+	for _, q := range s.mini {
+		if miniQuestsOn && !q.Claimed && int(q.Index) < len(chain) {
+			open = append(open, q)
+		}
+	}
+	w.VInt(int32(len(open)))
+	for _, q := range open {
+		mini, step := miniOfQuest(q)
+		w.Int(miniChainEvent(mini))
+		w.Int(step)
+		w.Bool(true)
+		writeQuest(w, q, chain[q.Index], miniChainEvent(mini), step, questCategoryMini, questsEnd(d))
+	}
+	vints(w, 2) // the other lists (+0xa0, ...)
+}
+
+// writeQuest writes one quest (decoder 0x3b3af4, the short form).
+func writeQuest(w *proto.Writer, q Quest, def questDef, event, index, category, end int32) {
+	w.VInt(event)
+	w.VInt(index)
+	w.VInt(def.TypeID)
+	// the kind's state (0x506b4c makes it by kind; its vtable+0x18
+	// writes it): MetaUpgrade two bools (0xea0478), WinRumble nothing
+	// (0xeb3fe0), PlayGameMode the mode, 2_PLAYER 2 / RUMBLE 3
+	// (0xec3568, 0x86517c)
+	w.Bool(true)
+	def.encodeState(w)
+	w.String(def.Text)
+	w.VInt(q.ID)
+	w.VInt(q.Progress)
+	w.VInt(def.Target)
+	w.VInt(0) // +0x30
+	w.VInt(category)
+	intList(w, def.Rewards)
+	w.String("") // +0x58
+	w.VInt(0)    // +0x18
+	// +0x1c: the end time (unix seconds, as the events'). A battle copies
+	// only the quests not yet ended (0x4f6854: +0x1c > now), and the quest
+	// screen lists only those (0x753e88); with 0 both had none.
+	w.VInt(end)
 }
 
 // QuestSummary: today's quests for the log ("" without live content).
@@ -341,6 +450,13 @@ func (a *Account) QuestSummary() string {
 		}
 		l = append(l, fmt.Sprintf("#%d %s %d/%d%s", q.ID, d.Kind, q.Progress, d.Target, st))
 	}
+	chain := miniChain()
+	for _, q := range a.MiniQuests {
+		if !q.Claimed && int(q.Index) < len(chain) {
+			mini, _ := miniOfQuest(q)
+			l = append(l, fmt.Sprintf("mini #%d %s %d/%d", q.ID, Data.CharName(miniCharRows[mini]), q.Progress, chain[q.Index].Target))
+		}
+	}
 	return strings.Join(l, ", ")
 }
 
@@ -355,9 +471,12 @@ func (d questDef) encodeState(w *proto.Writer) {
 		// the home (the client crashed in the next component).
 		r, _ := d.Own["UseRoundWins"].(bool)
 		w.Bool(r)
-		w.VInt(0)
-	case questPlayWithUnit:
-		w.VInt(0) // RequirementMini: none (0x5190c8)
+		w.VInt(d.req())
+	case questPlayWithUnit, questUpgradeUnit, questTotalKOs, questKeywordClash, questEndRoundAlive:
+		w.VInt(d.req()) // RequirementMini, a table 6 reference: none (0x5190c8, 0x4709ec, 0x4c8eac, 0x5d031c, 0x946038)
+	case questWinDuelPerfect, questWinGameNoReroll, questWinRoundNoDeath:
+		// nothing in the short form (a Bool only in the other, 0x8f7258,
+		// 0x92fd04; 0x792064 none)
 	case questResourceGained:
 		// Resource: a resources reference, row + 1 (0x473414)
 		w.VInt(resourceRankPoints + 1)
@@ -385,4 +504,5 @@ type questState struct {
 	lastID  int32
 	rerolls int32
 	taken   []int32 // the pool's taken indices (questPoolTaken)
+	mini    []Quest // the mini quests (minis.go)
 }

@@ -296,35 +296,39 @@ func TestChestAutoUpgrade(t *testing.T) {
 	}
 }
 
-// Daily quests: six a day, three at a time, counted by battles, trophies
-// and the road; the claim pushes the reward chest the client makes (source
-// 2, the quest id) and makes room for the next; one reroll takes the pool's
-// last quest.
+// Daily quests: six a day, all shown at once, counted by battles and the
+// road; the claim pushes the reward chest the client makes (source 2, the
+// quest id); one reroll takes the pool's last quest.
 func TestDailyQuests(t *testing.T) {
 	catalog := questCatalog
 	defer func() { questCatalog = catalog }()
 	win := questDef{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINWITHUNIT", 2, rewardSmall, map[string]any{"UseRoundWins": false}}
-	trophies := questDef{"MetaResourceGained", questResourceGained, "TID_CHRONOS_QUESTS_WINTROPHIES", 10, rewardBig, map[string]any{"Resource": "RankPoints"}}
-	questCatalog = []questDef{playDuels(3, rewardSmall), catalog[7], win, trophies,
-		{"MetaSeasonRoadLevel", questSeasonRoadLevel, "TID_CHRONOS_QUESTS_SEASONPASSLEVELUP", 2, rewardSmall, nil},
-		playRumbles(2, rewardSmall),
-		{"PlayWithUnit", questPlayWithUnit, "TID_CHRONOS_QUESTS_PLAYWITHUNIT", 4, rewardSmall, map[string]any{}}}
+	road := questDef{"MetaSeasonRoadLevel", questSeasonRoadLevel, "TID_CHRONOS_QUESTS_SEASONPASSLEVELUP", 2, rewardSmall, nil}
+	play := questDef{"PlayWithUnit", questPlayWithUnit, "TID_CHRONOS_QUESTS_PLAYWITHUNIT", 4, rewardSmall, map[string]any{}}
+	questCatalog = []questDef{playDuels(3, rewardSmall), catalog[8], win, road, playRumbles(2, rewardSmall), play, playDuels(5, rewardBig)}
 	day := time.Date(2026, 11, 4, 12, 0, 0, 0, time.Local)
 	now = func() time.Time { return day }
 	defer func() { now = time.Now }()
 	a := NewAccount()
 	a.StartProgression()
 	a.refreshQuests()
-	if len(a.Quests) != 3 || a.Quests[0].Index != 0 || a.Quests[2].Index != 2 {
+	if len(a.Quests) != questsPerDay || a.Quests[0].Index != 0 || a.Quests[5].Index != 5 {
 		t.Fatalf("quests %+v", a.Quests)
 	}
 	for i := 0; i < 3; i++ {
-		a.BattleResult(ModeDuel, 2, false) // played, lost: counts for PlayGameMode
+		a.BattleResult(ModeDuel, 2, false) // played, lost
 	}
-	a.BattleResult(ModeRumble, 2, false) // not the champion, but won (top 4)
+	a.BattleResult(ModeRumble, 2, false) // won (top 4), not the champion
 	a.BattleResult(ModeRumble, 1, false)
-	if a.Quests[0].Progress != 3 || a.Quests[1].Progress != 1 || a.Quests[2].Progress != 2 {
+	// duels 3/3, champion 1/1, win 2/2, rumbles 2/2, play 4/4 (5 battles)
+	if a.Quests[0].Progress != 3 || a.Quests[1].Progress != 1 || a.Quests[2].Progress != 2 ||
+		a.Quests[4].Progress != 2 || a.Quests[5].Progress != 4 {
 		t.Fatalf("progress %+v", a.Quests)
+	}
+	// the road: 2 tiers
+	a.applyContent(&Reward{}, ChestContent{Resources: map[string]int32{"SeasonPoints": 2}})
+	if a.Quests[3].Progress != 2 {
+		t.Fatalf("road %+v", a.Quests[3])
 	}
 	a.Quests[2].Progress = 1
 	if a.ClaimQuest(&Reward{}, a.Quests[2].ID) {
@@ -354,52 +358,23 @@ func TestDailyQuests(t *testing.T) {
 	if len(p) != 1 || p[0].Source != sourceQuest || p[0].SourceValue != a.Quests[0].ID || p[0].Index != a.ChestIndex {
 		t.Fatalf("pushes %+v", p)
 	}
-	if a.ClaimQuest(r, a.Quests[0].ID) {
-		t.Fatal("claimed twice")
+	if a.ClaimQuest(r, a.Quests[0].ID) || len(a.Quests) != questsPerDay {
+		t.Fatalf("claimed twice or a seventh quest %+v", a.Quests)
 	}
-	// the claimed one made room: the next index (3, trophies), not the
-	// rerolled-away 2
-	if len(a.Quests) != 4 || a.Quests[3].Index != 3 {
-		t.Fatalf("next quest %+v", a.Quests)
-	}
-	a.Trophies = 100
-	a.BattleResult(ModeDuel, 1, true)
-	if a.Quests[3].Progress == 0 {
-		t.Fatalf("trophies not counted %+v", a.Quests[3])
-	}
-	// the home: three open quests; the pool state as questPoolTaken
+	// the home: five open quests; the pool state as questPoolTaken
 	h := a.ownHome()
 	h.home.skinStore = false
 	m, err := decode(h.encode())
-	if err != nil || len(m.home.quests.quests) != 3 || len(m.home.events) != 4 || m.home.events[3].Type != EventGameModeMapping || m.home.events[0].Type != EventQuestPool || m.home.events[1].Type != EventSeasonData || m.home.events[2].Type != EventShopLayout {
+	if err != nil || len(m.home.quests.quests) != 5 || m.home.events[0].Type != EventQuestPool || m.home.events[1].Type != EventSeasonData || m.home.events[2].Type != EventShopLayout {
 		t.Fatalf("%v quests %+v events %d", err, m.home.quests.quests, len(m.home.events))
 	}
-	if fmt.Sprint(lastPoolState) != fmt.Sprint([]int32{dailyPoolEvent, 4, 0, 1, 3, 4, 5, 6}) {
+	if fmt.Sprint(lastPoolState) != fmt.Sprint([]int32{dailyPoolEvent, 6, 0, 1, 3, 4, 5, 6}) {
 		t.Fatalf("pool state %v", lastPoolState)
-	}
-	// six a day at most
-	for i := 0; i < 10; i++ {
-		for j := range a.Quests {
-			q := &a.Quests[j]
-			if !q.Claimed {
-				q.Progress = 99
-				a.ClaimQuest(r, q.ID)
-				break
-			}
-		}
-	}
-	if len(a.Quests) != questsPerDay {
-		t.Fatalf("%d quests today", len(a.Quests))
-	}
-	for _, q := range a.Quests {
-		if !q.Claimed {
-			t.Fatalf("not all claimed %+v", a.Quests)
-		}
 	}
 	// a changed pool: the saved quests point into it by index, new ones
 	a.QuestPool = "an older pool"
 	a.refreshQuests()
-	if len(a.Quests) != 3 || a.Quests[0].Claimed || a.QuestPool != questPoolSignature() {
+	if len(a.Quests) != questsPerDay || a.Quests[0].Claimed || a.QuestPool != questPoolSignature() {
 		t.Fatalf("pool changed %+v", a.Quests)
 	}
 	// next day: new quests
@@ -407,5 +382,76 @@ func TestDailyQuests(t *testing.T) {
 	a.refreshQuests()
 	if a.Quests[0].Claimed || a.Quests[0].Progress != 0 || a.QuestRerolls != 0 {
 		t.Fatalf("next day %+v", a.Quests)
+	}
+}
+
+// The client's own progress (battle kinds) comes from the hook: up only, to
+// the target at most; claimed and unknown quests stay as they are.
+func TestQuestsFromClient(t *testing.T) {
+	catalog := questCatalog
+	defer func() { questCatalog = catalog }()
+	ko := questDef{"TotalKOs", questTotalKOs, "TID_CHRONOS_QUESTS_TOTALKOS", 15, rewardSmall, map[string]any{}}
+	rounds := questDef{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINROUNDSWITHUNIT", 9, rewardBig, map[string]any{"UseRoundWins": true}}
+	questCatalog = []questDef{ko, rounds, playDuels(3, rewardSmall), playRumbles(2, rewardSmall),
+		{"WinRoundNoDeath", questWinRoundNoDeath, "TID_CHRONOS_QUESTS_WINROUNDNODEATH", 2, rewardSmall, nil},
+		{"WinGameNoReroll", questWinGameNoReroll, "TID_CHRONOS_QUESTS_WINGAMENOREROLL", 1, rewardSmall, nil},
+		{"WinDuelPerfect", questWinDuelPerfect, "TID_CHRONOS_QUESTS_WINDUELPERFECT", 1, rewardBig, nil}}
+	day := time.Date(2026, 11, 4, 12, 0, 0, 0, time.Local)
+	now = func() time.Time { return day }
+	defer func() { now = time.Now }()
+	a := NewAccount()
+	a.StartProgression()
+	a.refreshQuests()
+	ids := map[string]int32{}
+	for _, q := range a.Quests {
+		ids[questCatalog[q.Index].Text] = q.ID
+	}
+	// a won duel does not count for "win 9 rounds" on the server
+	a.BattleResult(ModeDuel, 1, false)
+	if q := a.Quests[1]; q.Progress != 0 {
+		t.Fatalf("rounds counted by the server %+v", q)
+	}
+	changed := a.QuestsFromClient([][2]int32{{ids["TID_CHRONOS_QUESTS_TOTALKOS"], 7}, {ids["TID_CHRONOS_QUESTS_WINROUNDSWITHUNIT"], 99}, {999, 5},
+		{ids["TID_CHRONOS_QUESTS_PLAY_DUEL"], 0}})
+	if len(changed) != 2 || a.Quests[0].Progress != 7 || a.Quests[1].Progress != 9 || a.Quests[2].Progress != 1 {
+		t.Fatalf("%v %+v", changed, a.Quests)
+	}
+	// claimed stays claimed and unchanged
+	a.ClaimQuest(&Reward{}, a.Quests[1].ID)
+	if c := a.QuestsFromClient([][2]int32{{a.Quests[1].ID, 3}}); len(c) != 0 || a.Quests[1].Progress != 9 {
+		t.Fatalf("claimed changed %v", c)
+	}
+	// the home writes all the kinds
+	h := a.ownHome()
+	h.home.skinStore = false
+	if m, err := decode(h.encode()); err != nil || len(m.home.quests.quests) != 5 {
+		t.Fatalf("%v %+v", err, m.home.quests.quests)
+	}
+}
+
+// Rounds the hook read: won rounds count for "win N rounds", a duel won
+// 3:0 for WinDuelPerfect; a lost round or an unknown count (-1) does not.
+func TestBattleRounds(t *testing.T) {
+	catalog := questCatalog
+	defer func() { questCatalog = catalog }()
+	rounds := questDef{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINROUNDSWITHUNIT", 9, rewardBig, map[string]any{"UseRoundWins": true}}
+	win := questDef{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINWITHUNIT", 2, rewardSmall, map[string]any{"UseRoundWins": false}}
+	perfect := questDef{"WinDuelPerfect", questWinDuelPerfect, "TID_CHRONOS_QUESTS_WINDUELPERFECT", 1, rewardBig, nil}
+	questCatalog = []questDef{rounds, win, perfect, playDuels(3, rewardSmall), playDuels(5, rewardBig), playRumbles(2, rewardSmall), playRumbles(3, rewardBig)}
+	day := time.Date(2026, 11, 4, 12, 0, 0, 0, time.Local)
+	now = func() time.Time { return day }
+	defer func() { now = time.Now }()
+	a := NewAccount()
+	a.StartProgression()
+	a.refreshQuests()
+	a.BattleRounds(ModeDuel, 1, 3, 1) // won 3:1
+	a.BattleRounds(ModeDuel, 1, 3, -1)
+	a.BattleRounds(ModeDuel, 2, 2, 3)
+	if a.Quests[0].Progress != 8 || a.Quests[1].Progress != 0 || a.Quests[2].Progress != 0 {
+		t.Fatalf("progress %+v", a.Quests)
+	}
+	a.BattleRounds(ModeDuel, 1, 3, 0) // 3:0
+	if a.Quests[0].Progress != 9 || a.Quests[2].Progress != 1 {
+		t.Fatalf("progress %+v", a.Quests)
 	}
 }

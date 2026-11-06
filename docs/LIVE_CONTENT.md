@@ -231,10 +231,8 @@ Fifth test: still the old quest again, without rewards. Two causes:
 
 ## Daily quest pool
 
-- QUEST_SETTINGS: six daily quests a day, three at a time, one reroll
-  ("Quests completed: 0/6" and three daily quests on the screenshots).
-  The server hands out three; a claim makes room for the next, which comes
-  with the next home.
+- QUEST_SETTINGS: six daily quests a day, all shown at once, one reroll
+  ("Quests completed: 0/6"). A claimed quest leaves the list.
 - The pool: seven quests a day out of the catalog (six and one for the
   reroll). The home's pool state lists every index but the reroll's as
   taken, the ones still to come too, so the client's reroll (0x785fac,
@@ -243,7 +241,9 @@ Fifth test: still the old quest again, without rewards. Two causes:
 - Kinds the server counts: PlayGameMode (duels, rumbles), PlayWithUnit (2,
   state: VInt RequirementMini, 0 none), WinWithUnit (1, state: Bool
   UseRoundWins, VInt RequirementMini; a duel won or a Rumble in the top 4), WinRumble, MetaResourceGained (25, state: VInt resource row + 1;
-  RankPoints, "Win N Trophies", ranked trophies won), MetaSeasonRoadLevel.
+  RankPoints, "Win N Trophies", ranked trophies won; out of the pool since
+  0075: a quest of that kind crashed the quest screen's hint, 0x834d64,
+  which found no resource), MetaSeasonRoadLevel.
   The data references are written by 0x37cc70: VInt row + 1, 0 for none.
 - The home reads its quests with flag 0 (0x4bce10 → 0x3b3af4): with the
   quest's tail (+0x30 …) and the states' short form. WinWithUnit's Bool
@@ -260,8 +260,62 @@ Fifth test: still the old quest again, without rewards. Two causes:
   WinRumble 19, WinGameNoReroll 20, WinRoundNoDeath 21, WinWithUnitList 22,
   AbilityHitInOneGame 23, MetaSeasonRoadLevel 24, MetaResourceGained 25,
   PlayGameMode 26 (state classes by 0x506b4c, their writers at vtable
-  +0x18). The battle kinds (rounds, knock outs, rerolls, 3:0) need what
-  happened in the battle, which the hook does not report yet.
+  +0x18).
+- The client counts its quests itself, the battle kinds too
+  (LogicQuestKnockOutEventHandler, …WinEventHandler, …WinRoundNoDeath-
+  Handler, …WinDuelPerfectHandler, …WinGameNoRerollHandler,
+  …KeywordClashEventHandler, …UpgradeEventHandler, …). Our server's next
+  home would put its own counts back, so after every bot battle the hook
+  reads the client's active quests (home `*(*(GameMode+0x68)+0x48)`, quest
+  manager +0x180, list +0x30 / count +0x3c, quest id +0x38, progress +0x3c)
+  and sends them (result frame mode 11: count, then int32 id / progress
+  pairs); the server takes the higher value (`QuestsFromClient`, 0076).
+  The battle does not count on the home's quests but on copies: at its
+  start (0x940898) the client takes the home's active quests that count in
+  battle (handler +0x68), are not done and have not ended (0x4f6854:
+  quest +0x1c, the end time in unix seconds, > now) and clones them into
+  a list per player (battle +0x238 + 8 * player, set by 0x32c3c4; array
+  +0x0, count +0xc). The events count on those (knock outs 0x5c59cc ->
+  0x4f28b0, the kind's handler +0x88). With +0x1c 0 (until 0079) the lists
+  stayed empty; now +0x1c is the daily reset, and the hook reads the
+  battle's list (0079). The hook also sends the rounds with the result
+  (0078, `BattleRounds`).
+- Battle kinds in the pool (0076): win 9 rounds (WinWithUnit with
+  UseRoundWins, not counted by the server), knock out 15 (TotalKOs), win
+  without rerolling (20), win rounds without losing a mini (21), 3:0 in a
+  duel (18), Clash abilities (5), upgrades in battle (UpgradeUnit 3).
+  States in the home's short form: VInt RequirementMini for 3, 4, 5, 7;
+  nothing for 18, 20, 21.
+- RequirementMini (mini quests, "using <unit>") is a reference into data
+  table 6 (`*(libg+0x1080778)`, 0x6d3e64 / 0x60c69c): no CSV is loaded
+  into it by index, but the hook found 69 items, the 55 rows of
+  characters.csv then the 14 of characters_heroes.csv. A mini is its
+  characters.csv row + 1 (KnightB1 1, BarbarianB1 2, …); in JSON its name.
+- In a battle the game mode points to the battle, not the home: the hook
+  remembers the quest manager while at home and reads it at the end screen
+  (0077; 0076 found nothing).
+
+## Mini quests (`home/minis.go`, 0077)
+
+- The quest screen's MINI QUESTS are quests of category 3 ("Tutorial";
+  QUEST_CHAIN categories 0x71d454: Season 1, Daily 2, Tutorial 3, Weekly 4,
+  Competitive 5). For every owned mini: win 1, 3 and 5 matches using it,
+  one after the other (digistatement), reward quest_Daily_Mini (1 Pony
+  Fuel and a mini fragment, as on the screenshots).
+- Ours: one QUEST_CHAIN event per mini with an open quest (1100 + the
+  mini's index; Chain: win 1, 3, 5 with it; Category Tutorial). A chain's
+  quest goes in the quest manager's chains' state, not the active list:
+  per chain a LogicLong (event id, ours the step) and a Bool + the quest
+  (+0x40 / +0x50; encoder 0x31b91c, decoder 0x4bd2d8). The client looks
+  each chain's event up by the key's id (0x7a3250), the quest screen
+  shows the chain's quest; a claim frees the slot (0x7b170c) and the
+  client hands out the chain's next step itself, as the server does
+  (claimMiniQuest, the next quest id).
+- The live quest data names the unit its own way (WinWithUnit 0x974bb0:
+  the kind's object with UseRoundWins, PieceRequirementType None / Mini /
+  MiniFromList (0x31aec4), UnitList the names, resolved by name through
+  table 6). With RequirementMini only (0081) the next step had no mini
+  and showed "<name>"; 0082 worked around it, 0083 sends MiniFromList.
 
 ## Boards (`home/boards.go`)
 

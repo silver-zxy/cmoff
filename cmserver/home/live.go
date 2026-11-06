@@ -31,7 +31,7 @@ func LiveGlobals() []string {
 		"ID": "QUEST_SETTINGS",
 		"Params": map[string]any{
 			"Enabled":                   true,
-			"MaxConcurrentQuests":       questsConcurrent,
+			"MaxConcurrentQuests":       questsConcurrent + miniQuestsShown, // room for them when on
 			"MaxConcurrentDailyQuests":  questsConcurrent,
 			"MaxTotalDailyQuests":       questsPerDay,
 			"DailyQuestRerollLimit":     questRerollsPerDay,
@@ -106,6 +106,19 @@ type questDef struct {
 	Own     map[string]any
 }
 
+// req: the unit the quest names (Own "RequirementMini", a characters.csv
+// name) as a table 6 reference: its row + 1; 0 for none.
+func (q questDef) req() int32 {
+	name, _ := q.Own["RequirementMini"].(string)
+	if name == "" {
+		return 0
+	}
+	if row, ok := Data.CharRow(name); ok {
+		return row + 1
+	}
+	return 0
+}
+
 // Reward chests of chests.json. quest_Daily_Small is the daily quest's
 // "1 Pony Fuel, 10-30 gold" of the screenshots; the "100 gold" quests give
 // quest_gold_100 and a Pony Fuel (SeasonPoint_1).
@@ -125,6 +138,13 @@ var (
 const (
 	questWinWithUnit      int32 = 1
 	questPlayWithUnit     int32 = 2
+	questUpgradeUnit      int32 = 3
+	questTotalKOs         int32 = 4
+	questKeywordClash     int32 = 5
+	questEndRoundAlive    int32 = 7
+	questWinDuelPerfect   int32 = 18
+	questWinGameNoReroll  int32 = 20
+	questWinRoundNoDeath  int32 = 21
 	questMetaUpgrade      int32 = 9
 	questWinRumble        int32 = 19
 	questSeasonRoadLevel  int32 = 24
@@ -147,12 +167,34 @@ var questCatalog = []questDef{
 	{"MetaSeasonRoadLevel", questSeasonRoadLevel, "TID_CHRONOS_QUESTS_SEASONPASSLEVELUP", 2,
 		rewardSmall, nil},
 	playDuels(5, rewardBig),
+	playRumbles(3, rewardBig),
 	{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINWITHUNIT", 4,
 		rewardBig, map[string]any{"UseRoundWins": false}},
 	{"WinRumble", questWinRumble, "TID_CHRONOS_QUESTS_WINRUMBLE", 1,
 		rewardBig, nil},
-	{"MetaResourceGained", questResourceGained, "TID_CHRONOS_QUESTS_WINTROPHIES", 10,
-		rewardBig, map[string]any{"Resource": resourceRankPointsKey}},
+	// Battle kinds: the client counts them on the battle's copies of the
+	// quests (they need an end time, quests.go), the hook reports the
+	// progress after the battle (QuestsFromClient). Rounds and 3:0 the
+	// server also counts from the hook's rounds (BattleRounds). On the
+	// screenshots: win 9 rounds (100 gold), knock out 15 (10-30), win 1
+	// match without rerolling (10-30).
+	{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINROUNDSWITHUNIT", 9,
+		rewardBig, map[string]any{"UseRoundWins": true}},
+	{"WinDuelPerfect", questWinDuelPerfect, "TID_CHRONOS_QUESTS_WINDUELPERFECT", 1,
+		rewardBig, nil},
+	{"TotalKOs", questTotalKOs, "TID_CHRONOS_QUESTS_TOTALKOS", 15,
+		rewardSmall, map[string]any{}},
+	{"WinGameNoReroll", questWinGameNoReroll, "TID_CHRONOS_QUESTS_WINGAMENOREROLL", 1,
+		rewardSmall, nil},
+	{"WinRoundNoDeath", questWinRoundNoDeath, "TID_CHRONOS_QUESTS_WINROUNDNODEATH", 2,
+		rewardSmall, nil},
+	{"UseKeywordClash", questKeywordClash, "TID_CHRONOS_QUESTS_USEKEYWORDCLASH", 10,
+		rewardSmall, map[string]any{}},
+	{"UpgradeUnit", questUpgradeUnit, "TID_CHRONOS_QUESTS_UPGRADEUNIT", 5,
+		rewardSmall, map[string]any{}},
+	// Not "Win N Trophies" (MetaResourceGained): a quest of that kind the
+	// client made from the pool crashed the quest screen (its hint,
+	// 0x834d64, found no resource), 0075.
 }
 
 func playDuels(n int32, rewards []int32) questDef {
@@ -184,12 +226,11 @@ func todaysQuests() []questDef {
 	return out
 }
 
-// A day: six daily quests, three at a time ("Quests completed: 0/6" and
-// three daily quests on the screenshots); a claimed one makes room for the
-// next.
+// A day: six daily quests, all of them shown at once ("Quests completed:
+// 0/6"); a claimed one leaves the list.
 const (
 	questsPerDay     = 6
-	questsConcurrent = 3
+	questsConcurrent = 6
 )
 
 func (q questDef) json() map[string]any {
@@ -201,7 +242,25 @@ func (q questDef) json() map[string]any {
 		"Rewards":      chestNames(q.Rewards),
 	}
 	if q.Own != nil {
-		m[q.Kind] = q.Own
+		own := map[string]any{}
+		for k, v := range q.Own {
+			own[k] = v
+		}
+		// the live quest data names its unit differently from the quest
+		// (WinWithUnit's 0x974bb0: PieceRequirementType None / Mini /
+		// MiniFromList, UnitList the names, through table 6 by name); with
+		// RequirementMini only, a quest the client made from it had no mini
+		// and showed "<name>"
+		if name, ok := q.Own["RequirementMini"].(string); ok && name != "" {
+			own["PieceRequirementType"] = "MiniFromList"
+			own["UnitList"] = []string{name}
+		}
+		m[q.Kind] = own
+		// also at the quest's top level: the kinds' readers may take
+		// their keys from there
+		for k, v := range own {
+			m[k] = v
+		}
 	}
 	return m
 }
@@ -250,9 +309,10 @@ func LiveEvents() []LiveEvent {
 		"LevelLimitHigh":   999,
 	}
 	b, _ := json.Marshal(pool)
-	return []LiveEvent{{
+	events := []LiveEvent{{
 		ID: dailyPoolEvent, Name: "daily_quests", Type: EventQuestPool,
 		Start: start, End: end, VisibleStart: start, VisibleEnd: end,
 		Parameters: string(b),
 	}, seasonLiveEvent(), shopLiveEvent()}
+	return events
 }

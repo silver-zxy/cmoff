@@ -56,9 +56,13 @@ type Account struct {
 	QuestRerolls int32   `json:"quest_rerolls,omitempty"`
 	QuestPool    string  `json:"quest_pool,omitempty"`
 	// QuestDropped: today's pool indices rerolled away (not handed out again)
-	QuestDropped []int32     `json:"quest_dropped,omitempty"`
-	Season       SeasonState `json:"season"`
-	Purchases    []Purchase  `json:"purchases,omitempty"`
+	QuestDropped []int32 `json:"quest_dropped,omitempty"`
+	// MiniQuests: the mini quests handed out (minis.go); MiniSteps: per
+	// characters.csv row, how many of a mini's quests were claimed
+	MiniQuests []Quest         `json:"mini_quests,omitempty"`
+	MiniSteps  map[int32]int32 `json:"mini_steps,omitempty"`
+	Season     SeasonState     `json:"season"`
+	Purchases  []Purchase      `json:"purchases,omitempty"`
 	// StarterChests: the starting chests have been given (chests.go)
 	StarterChests bool             `json:"starter_chests,omitempty"`
 	Collection    map[int32]*Owned `json:"collection,omitempty"`
@@ -280,7 +284,9 @@ func (a *Account) ownHome() ownHomeData {
 	}
 	if Live {
 		a.refreshQuests()
-		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken()}
+		a.refreshMiniQuests()
+		h.events = append(h.events, a.miniChainEvents()...)
+		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken(), mini: a.MiniQuests}
 		// the server time, unix seconds: the tail's second VInt (msg +0x9c,
 		// 0x48b2e4) becomes the logic's time base (+0x1d4 via 0x85f100,
 		// 0x327c54; now = ticks/20 + base, 0x4df510). At 0 the events'

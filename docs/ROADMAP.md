@@ -32,10 +32,16 @@ the phone before the next.
 - Tested on the phone: the starting chest as one chest, the road's info
   page, the shop's chests.
 - Research: docs/ORIGINAL.md (sources, wiki, screenshots).
+- Tested on the phone (November 2026): boards by league (A0), bots with
+  their decks' own levels (A1), the shop with the original prices (A2),
+  daily quests six at once, the battle kinds counted by the client
+  (0079), mini quests with the next step right after a claim (0083),
+  Crystal Coins (A4), the Adventure Road with 90 tiers and the free Mini
+  Pass (A6, A7), the help page.
 
 ## Part A: what we know
 
-### A0. Boards by league (0071, 0072; to test)
+### A0. Boards by league (0071, 0072; tested)
 
 - Season 1's game modes by league (game_modes.csv): Silver plays on
   Electro Valley and Healing Temple, Gold and up also on Banquet Hall;
@@ -43,7 +49,7 @@ the phone before the next.
   for bot battles the server picks the board and the hook sets it on the
   bot (the client took the mapping, but bot battles keep the bot's board).
 
-### A1. Bots as in the original (patch 0064, to test)
+### A1. Bots as in the original (patch 0064; tested)
 
 - The bots keep their decks' own levels from bot_decks.csv (93 decks by
   league: Bronze heroes 1–4, minis 1–2 … Grandmaster 10 and 4); the
@@ -52,7 +58,7 @@ the phone before the next.
   10 and 4. The generated decks (BOT_DECK_NORMAL / NEWBIE) are built
   from the player's collection by the client and not touched.
 
-### A2. Shop as on the screenshots (0065: minis, heroes; to test)
+### A2. Shop as on the screenshots (0065: minis, heroes; tested)
 
 | Module | Original | Ours |
 |---|---|---|
@@ -67,19 +73,29 @@ the phone before the next.
 
 ### A3. Quests as on the screenshots
 
-Done in 0065 (to test):
-- Daily: **6 a day, 3 at a time**, 1 reroll; rewards the game's chests:
+Done in 0065 (tested):
+- Daily: **6 a day, all at once** (0075), 1 reroll; rewards the game's chests:
   quest_Daily_Small (1 Pony Fuel, 10–30 gold) or 100 gold and 1 fuel.
 - Kinds the server can count: play duels / rumbles / matches, win matches,
-  finish a Rumble first, win N trophies, advance on the road N times.
+  finish a Rumble first, advance on the road N times ("win N trophies"
+  crashed the quest screen and is out, 0075).
+
+Also done:
+- Battle kinds (0079, tested): a battle copies the home's quests that
+  have not ended (+0x1c end time > now); we sent 0, so the battle had none
+  and counted nothing. Now the quests carry the daily reset as their end;
+  the client counts knock outs, rounds, no reroll, rounds without a loss,
+  3:0, Clash and upgrades on the battle's copies (battle +0x238 per
+  player) and the hook reports them after the battle. Rounds and 3:0 the
+  server also counts from the hook's rounds (0078).
+- Mini quests (0077, 0080, 0081, 0083; tested): win 1, 3, 5 matches
+  using each owned mini, three at a time, quest_Daily_Mini; category 3 (MINI
+  QUESTS). They were missing on the quest screen because it lists only
+  quests not ended (0x753e88, +0x1c), and we sent 0 (fixed in 0079),
+  and a chain's quest belongs in the chains' state, one chain event per
+  mini (0081).
 
 Still to do:
-- Battle kinds (win N rounds, knock out N, win without rerolling, 3:0,
-  Clash abilities): the hook has to report what happened in the battle
-  (rounds, knock outs, rerolls; to find in the client's battle).
-- Mini quests: WinWithUnit with RequirementMini (a characters reference),
-  quest_Daily_Mini (1 fuel and a fragment); their own section in the
-  quest screen ("MINI QUESTS", category to find).
 - Clashmas quests: the quest group (event type 6) with the Candy Elf
   (shop_skin_SpearGoblinElf, icon_xmas_quest); the 6 known:
 
@@ -92,7 +108,7 @@ Still to do:
   | Prince charges 3 enemies in a match | 10 Crystal Coins, 10 gems |
   | 6 matches with Royal Champion | 15 Crystal Coins |
 
-### A4. Crystal Coins (0065, 0074; to test)
+### A4. Crystal Coins (0065, 0074; tested)
 
 - The server counts PromotionToken ("Crystal Coin", at most 9999) from
   chests and shows it in the home.
@@ -111,19 +127,18 @@ Still to do:
   ("You already own this Skin!") and how the home holds owned skins: to
   check.
 
-### A6. Season 1 road: 90 tiers (0065, to test)
+### A6. Season 1 road: 90 tiers (0065; tested)
 
 - 90 tiers, 1 / 2 / 3 fuel on tiers 1–30 / 31–60 / 61–90 (180 in all);
   a new Season 1 every two months; Pony Fuel from the daily quests.
 - The free lane: the game's season chests; the season's mini on 10, 30, 60.
 
-### A7. Mini Pass free (0065, to test)
+### A7. Mini Pass free (0065; tested)
 
 - The pass lane is everyone's (+0x4c true), 601 claims both lanes.
 - The pass's text: 300+ hero fragments (ours: about 334), 2 seasonal skins
   (P.L.U.S.H. P.E.K.K.A at tier 26, Luchador Monk at 87, wiki), 200 gems,
   2000 gold.
-- To check on the phone: the pass's buy button.
 
 ### A8. Season end (every two months)
 
@@ -168,7 +183,7 @@ videos, r/ClashMini), the wiki's Mini Pass page as text.
 
 ## Later
 
-- ~~Help & Support~~ (0067, to test): opens our own help page
+- ~~Help & Support~~ (0067, tested): opens our own help page
   (cmoffline/help/help.html, built into the APK's locales.csv); keep its
   "Neu" list up to date with each patch.
 

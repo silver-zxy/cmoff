@@ -70,6 +70,9 @@ const HookBattleResult = 19999
 const (
 	hookTutorialDone = 9
 	hookTutorialHome = 10 // the battle part is over; extra = tutorial flags
+	// hookQuestProgress: the client's quest progress after a battle; place =
+	// count, then (int32 id, int32 progress) pairs, big-endian
+	hookQuestProgress = 11
 )
 
 // tutorialDone: the new player picked a hero in the tutorial's first
@@ -324,6 +327,24 @@ func (s *Server) handleResult(p []byte) {
 	case hookTutorialDone: // the hook saw the tutorial finish
 		s.tutorialDone(place)
 		return
+	case hookQuestProgress:
+		var pairs [][2]int32
+		for i := 0; i < int(place) && 2+8*i+8 <= len(p); i++ {
+			o := p[2+8*i:]
+			pairs = append(pairs, [2]int32{
+				int32(o[0])<<24 | int32(o[1])<<16 | int32(o[2])<<8 | int32(o[3]),
+				int32(o[4])<<24 | int32(o[5])<<16 | int32(o[6])<<8 | int32(o[7])})
+		}
+		s.acc.Lock()
+		changed := s.acc.QuestsFromClient(pairs)
+		s.acc.Unlock()
+		if len(changed) > 0 {
+			if err := s.acc.Save(); err != nil {
+				log.Printf("save account: %v", err)
+			}
+			log.Printf("quests: the client counted %s", strings.Join(changed, ", "))
+		}
+		return
 	case hookTutorialHome:
 		s.acc.Lock()
 		s.acc.TutorialFlags = extra
@@ -347,6 +368,15 @@ func (s *Server) handleResult(p []byte) {
 		return
 	}
 	s.acc.Lock()
+	// extra: 0x8000 | rounds lost << 8 | rounds won (0x7f lost: unknown)
+	if extra&0x8000 != 0 && place != 0 {
+		wonR, lost := extra&0xff, extra>>8&0x7f
+		if lost == 0x7f {
+			lost = -1
+		}
+		s.acc.BattleRounds(mode, place, wonR, lost)
+		log.Printf("battle rounds: won %d, lost %d", wonR, lost)
+	}
 	o := s.acc.BattleResult(mode, place, b.ranked)
 	trophies, st := s.acc.Trophies, s.acc.Stats
 	s.acc.Unlock()
