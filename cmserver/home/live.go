@@ -31,7 +31,7 @@ func LiveGlobals() []string {
 		"ID": "QUEST_SETTINGS",
 		"Params": map[string]any{
 			"Enabled":                   true,
-			"MaxConcurrentQuests":       questsConcurrent,
+			"MaxConcurrentQuests":       questsConcurrent + miniQuestsShown,
 			"MaxConcurrentDailyQuests":  questsConcurrent,
 			"MaxTotalDailyQuests":       questsPerDay,
 			"DailyQuestRerollLimit":     questRerollsPerDay,
@@ -104,6 +104,19 @@ type questDef struct {
 	Target  int32
 	Rewards []int32 // chests.json ids
 	Own     map[string]any
+}
+
+// req: the unit the quest names (Own "RequirementMini", a characters.csv
+// name) as a table 6 reference: its row + 1; 0 for none.
+func (q questDef) req() int32 {
+	name, _ := q.Own["RequirementMini"].(string)
+	if name == "" {
+		return 0
+	}
+	if row, ok := Data.CharRow(name); ok {
+		return row + 1
+	}
+	return 0
 }
 
 // Reward chests of chests.json. quest_Daily_Small is the daily quest's
@@ -228,6 +241,11 @@ func (q questDef) json() map[string]any {
 	}
 	if q.Own != nil {
 		m[q.Kind] = q.Own
+		// also at the quest's top level: the kinds' readers may take
+		// their keys from there
+		for k, v := range q.Own {
+			m[k] = v
+		}
 	}
 	return m
 }
@@ -276,9 +294,13 @@ func LiveEvents() []LiveEvent {
 		"LevelLimitHigh":   999,
 	}
 	b, _ := json.Marshal(pool)
-	return []LiveEvent{{
+	events := []LiveEvent{{
 		ID: dailyPoolEvent, Name: "daily_quests", Type: EventQuestPool,
 		Start: start, End: end, VisibleStart: start, VisibleEnd: end,
 		Parameters: string(b),
 	}, seasonLiveEvent(), shopLiveEvent()}
+	if len(miniChain()) > 0 {
+		events = append(events, miniChainLiveEvent())
+	}
+	return events
 }

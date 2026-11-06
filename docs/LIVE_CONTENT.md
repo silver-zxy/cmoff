@@ -277,9 +277,30 @@ Fifth test: still the old quest again, without rewards. Two causes:
   States in the home's short form: VInt RequirementMini for 3, 4, 5, 7;
   nothing for 18, 20, 21.
 - RequirementMini (mini quests, "using <unit>") is a reference into data
-  table 6 (`*(libg+0x1080778)`, 0x6d3e64 / 0x60c69c), which no CSV is
-  loaded into; the hook logs what it holds (0076) before quests name a
-  unit.
+  table 6 (`*(libg+0x1080778)`, 0x6d3e64 / 0x60c69c): no CSV is loaded
+  into it by index, but the hook found 69 items, the 55 rows of
+  characters.csv then the 14 of characters_heroes.csv. A mini is its
+  characters.csv row + 1 (KnightB1 1, BarbarianB1 2, …); in JSON its name.
+- In a battle the game mode points to the battle, not the home: the hook
+  remembers the quest manager while at home and reads it at the end screen
+  (0077; 0076 found nothing).
+
+## Mini quests (`home/minis.go`, 0077)
+
+- The quest screen's MINI QUESTS are quests of category 3 ("Tutorial";
+  QUEST_CHAIN categories 0x71d454: Season 1, Daily 2, Tutorial 3, Weekly 4,
+  Competitive 5). For every owned mini: win 1, 3 and 5 matches using it,
+  one after the other (digistatement), reward quest_Daily_Mini (1 Pony
+  Fuel and a mini fragment, as on the screenshots).
+- Ours: one QUEST_CHAIN event (1002, Category Tutorial) with the three
+  quests of each of the client's 22 minis (WinWithUnit with
+  RequirementMini, TID_CHRONOS_QUESTS_WINWITHUNITSPECIFIC); the home
+  hands out the next step of three owned minis at a time, the selected
+  deck's first. A won match counts for the deck's minis on the server; the
+  client's own count comes with the hook's report.
+- The kinds' keys also go at the quest's top level in the JSON (besides
+  the object named like the kind): the "Win N Trophies" crash suggests the
+  readers may take them from there.
 
 ## Boards (`home/boards.go`)
 

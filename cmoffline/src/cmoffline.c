@@ -606,12 +606,29 @@ static void report_result(int mode, int place) { report_result_ex(mode, place, 0
 #define QUESTS_ACTIVE_N     0x3c
 #define QUEST_ID            0x38
 #define QUEST_PROGRESS      0x3c
-#define QUESTS_MAX          16
+#define QUESTS_MAX          40
 
-static void report_quests(uint8_t *gm) {
+/* In a battle the game mode points to the battle, not the home: the quest
+ * manager is remembered while at home (state 4) and read from there. */
+static uint8_t *home_quests;
+
+static uint8_t *quests_of(uint8_t *gm) {
     uint8_t *mode = peek_ptr(gm, GM_MODE);
     uint8_t *home = peek_ptr(peek_ptr(mode, LOGIC_BATTLE_OWNER), LOGIC_MODE_HOME);
-    uint8_t *qm = peek_ptr(home, HOME_QUESTS);
+    return peek_ptr(home, HOME_QUESTS);
+}
+
+static void remember_quests(uint8_t *gm) {
+    uint8_t *qm = quests_of(gm);
+    if (qm && qm != home_quests) {
+        home_quests = qm;
+        LOG("quests: manager at %p (%d active)", (void *)qm, peek_int(qm, QUESTS_ACTIVE_N, -1));
+    }
+}
+
+static void report_quests(uint8_t *gm) {
+    uint8_t *qm = quests_of(gm);
+    if (!qm) qm = home_quests;
     uint8_t *list = peek_ptr(qm, QUESTS_ACTIVE);
     int n = peek_int(qm, QUESTS_ACTIVE_N, -1);
     if (!list || n < 0 || n > 64) { LOG("quests: not readable (%d)", n); return; }
@@ -645,9 +662,9 @@ static void report_quests(uint8_t *gm) {
     if (!ok) LOG("quests: could not reach the server");
 }
 
-/* Diagnostics for mini quests: their unit (RequirementMini) is a reference
- * into data table 6 (0x6d3e64 / 0x60c69c, *(libg+0x1080778)), which no CSV
- * is loaded into. Log once what it holds. */
+/* Diagnostics: a quest's unit (RequirementMini) is a reference into data
+ * table 6 (0x6d3e64 / 0x60c69c, *(libg+0x1080778)): 69 items, the 55 of
+ * characters.csv then the 14 of characters_heroes.csv. Logged once. */
 #define LIBG_TABLE6 0x1080778
 static void log_table6(void) {
     uint8_t *t = *(uint8_t **)G(LIBG_TABLE6);
@@ -875,6 +892,7 @@ static void battles_main(void) {
         {
             static int table6_logged;
             if (state == 4 && !table6_logged++) log_table6();
+            if (state == 4) remember_quests(gm);
         }
         watch_tutorial(gm, state);
         log_tutorial_flags(gm);

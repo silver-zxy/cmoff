@@ -79,9 +79,8 @@ Still to do:
   rounds without losing a mini, Clash, upgrades in battle): the client
   counts them, the hook reports its progress after each battle (0076, to
   test).
-- Mini quests: WinWithUnit with RequirementMini (a characters reference),
-  quest_Daily_Mini (1 fuel and a fragment); their own section in the
-  quest screen ("MINI QUESTS", category to find).
+- Mini quests (0077, to test): win 1, 3, 5 matches using each owned
+  mini, three at a time, quest_Daily_Mini; category 3 (MINI QUESTS).
 - Clashmas quests: the quest group (event type 6) with the Candy Elf
   (shop_skin_SpearGoblinElf, icon_xmas_quest); the 6 known:
 

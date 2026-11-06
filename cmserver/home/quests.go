@@ -39,6 +39,7 @@ type Quest struct {
 }
 
 const (
+	questCategoryMini  int32 = 3 // "Tutorial", the quest screen's MINI QUESTS (0x71d454)
 	questCategoryDaily int32 = 2
 	sourceQuest        int32 = 2
 )
@@ -200,6 +201,9 @@ func (a *Account) questsAfterBattle(mode, place int32) {
 			return !r // rounds: the client counts them
 		})
 	}
+	if won(mode, place) {
+		a.miniQuestsWon()
+	}
 	if mode == ModeRumble && place == 1 { // "Finish as the Champion"
 		a.questProgress(questWinRumble, 1, nil)
 	}
@@ -212,7 +216,19 @@ func (a *Account) questsAfterBattle(mode, place int32) {
 func (a *Account) QuestsFromClient(progress [][2]int32) (changed []string) {
 	a.refreshQuests()
 	pool := todaysQuests()
+	chain := miniChain()
 	for _, p := range progress {
+		for i := range a.MiniQuests {
+			q := &a.MiniQuests[i]
+			if q.ID != p[0] || q.Claimed || int(q.Index) >= len(chain) {
+				continue
+			}
+			d := chain[q.Index]
+			if v := min(p[1], d.Target); v > q.Progress {
+				q.Progress = v
+				changed = append(changed, fmt.Sprintf("#%d mini %d/%d", q.ID, v, d.Target))
+			}
+		}
 		for i := range a.Quests {
 			q := &a.Quests[i]
 			if q.ID != p[0] || q.Claimed || int(q.Index) >= len(pool) {
@@ -247,6 +263,9 @@ func (a *Account) questsRoadTiers(n int32) {
 
 // ClaimQuest is 503: the quest's reward chest, made by the client.
 func (a *Account) ClaimQuest(r *Reward, id int32) bool {
+	if a.claimMiniQuest(r, id) {
+		return true
+	}
 	a.refreshQuests()
 	pool := todaysQuests()
 	for i := range a.Quests {
@@ -310,11 +329,27 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 			active = append(active, q)
 		}
 	}
-	w.VInt(int32(len(active)))
 	pool := todaysQuests()
+	type shown struct {
+		q        Quest
+		def      questDef
+		event    int32
+		category int32
+	}
+	var list []shown
 	for _, q := range active {
-		def := pool[q.Index]
-		w.VInt(dailyPoolEvent)
+		list = append(list, shown{q, pool[q.Index], dailyPoolEvent, questCategoryDaily})
+	}
+	chain := miniChain()
+	for _, q := range s.mini {
+		if !q.Claimed && int(q.Index) < len(chain) {
+			list = append(list, shown{q, chain[q.Index], miniChainEvent, questCategoryMini})
+		}
+	}
+	w.VInt(int32(len(list)))
+	for _, e := range list {
+		q, def := e.q, e.def
+		w.VInt(e.event)
 		w.VInt(q.Index)
 		w.VInt(def.TypeID)
 		// the kind's state (0x506b4c makes it by kind; its vtable+0x18
@@ -328,7 +363,7 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 		w.VInt(q.Progress)
 		w.VInt(def.Target)
 		w.VInt(0) // +0x30
-		w.VInt(questCategoryDaily)
+		w.VInt(e.category)
 		intList(w, def.Rewards)
 		w.String("") // +0x58
 		w.VInt(0)    // +0x18
@@ -381,9 +416,9 @@ func (d questDef) encodeState(w *proto.Writer) {
 		// the home (the client crashed in the next component).
 		r, _ := d.Own["UseRoundWins"].(bool)
 		w.Bool(r)
-		w.VInt(0)
+		w.VInt(d.req())
 	case questPlayWithUnit, questUpgradeUnit, questTotalKOs, questKeywordClash, questEndRoundAlive:
-		w.VInt(0) // RequirementMini, a table 6 reference: none (0x5190c8, 0x4709ec, 0x4c8eac, 0x5d031c, 0x946038)
+		w.VInt(d.req()) // RequirementMini, a table 6 reference: none (0x5190c8, 0x4709ec, 0x4c8eac, 0x5d031c, 0x946038)
 	case questWinDuelPerfect, questWinGameNoReroll, questWinRoundNoDeath:
 		// nothing in the short form (a Bool only in the other, 0x8f7258,
 		// 0x92fd04; 0x792064 none)
@@ -414,4 +449,5 @@ type questState struct {
 	lastID  int32
 	rerolls int32
 	taken   []int32 // the pool's taken indices (questPoolTaken)
+	mini    []Quest // the mini quests (minis.go)
 }

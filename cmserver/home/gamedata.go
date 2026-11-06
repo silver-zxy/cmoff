@@ -68,6 +68,8 @@ type GameData struct {
 	// miniCost: a mini's elixir cost by seasonal row (characters.csv
 	// ManaCost of the row's Season1 character)
 	miniCost map[int32]int32
+	// charName: characters.csv names by row (the quests' RequirementMini)
+	charName map[int32]string
 }
 
 // chestBase: chest ids are 127000000 + their index in chests.json.
@@ -113,6 +115,12 @@ func LoadGameData(apk string) (*GameData, error) {
 	seas, err2 := readCSV(z, "assets/csv_logic/seasonal_character_mapping.csv")
 	if err1 == nil && err2 == nil {
 		d.miniCost = miniCosts(chars, seas)
+	}
+	if err1 == nil {
+		d.charName = map[int32]string{}
+		for i, r := range chars.rows {
+			d.charName[int32(i)] = chars.get(r, "Name")
+		}
 	}
 	return d, nil
 }
@@ -281,4 +289,25 @@ func (d *GameData) Chest(id int32) (chestDef, bool) {
 		return chestDef{}, false
 	}
 	return d.chests[i], true
+}
+
+// CharName: a characters.csv row's name ("" if unknown).
+func (d *GameData) CharName(row int32) string {
+	if d == nil {
+		return ""
+	}
+	return d.charName[row]
+}
+
+// CharRow: a characters.csv name's row.
+func (d *GameData) CharRow(name string) (int32, bool) {
+	if d == nil {
+		return 0, false
+	}
+	for row, n := range d.charName {
+		if n == name {
+			return row, true
+		}
+	}
+	return 0, false
 }
