@@ -44,7 +44,7 @@ const (
 )
 
 // refreshQuests: today's quests, new ones when the day changed, and the
-// next ones while fewer than three are open.
+// next ones while fewer than questsConcurrent are open.
 func (a *Account) refreshQuests() {
 	if !Live {
 		return
@@ -66,7 +66,7 @@ func (a *Account) refreshQuests() {
 // questRerollIndex: the pool index kept for the reroll (the pool's last).
 const questRerollIndex = questPoolSize - 1
 
-// topUpQuests hands out the pool's next quests while fewer than three are
+// topUpQuests hands out the pool's next quests while fewer than questsConcurrent are
 // open and fewer than six were handed out today. The next is the lowest
 // index not handed out, not rerolled away, and not the reroll's.
 func (a *Account) topUpQuests() {

@@ -147,12 +147,14 @@ var questCatalog = []questDef{
 	{"MetaSeasonRoadLevel", questSeasonRoadLevel, "TID_CHRONOS_QUESTS_SEASONPASSLEVELUP", 2,
 		rewardSmall, nil},
 	playDuels(5, rewardBig),
+	playRumbles(3, rewardBig),
 	{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINWITHUNIT", 4,
 		rewardBig, map[string]any{"UseRoundWins": false}},
 	{"WinRumble", questWinRumble, "TID_CHRONOS_QUESTS_WINRUMBLE", 1,
 		rewardBig, nil},
-	{"MetaResourceGained", questResourceGained, "TID_CHRONOS_QUESTS_WINTROPHIES", 10,
-		rewardBig, map[string]any{"Resource": resourceRankPointsKey}},
+	// Not "Win N Trophies" (MetaResourceGained): a quest of that kind the
+	// client made from the pool crashed the quest screen (its hint,
+	// 0x834d64, found no resource), 0075.
 }
 
 func playDuels(n int32, rewards []int32) questDef {
@@ -184,12 +186,11 @@ func todaysQuests() []questDef {
 	return out
 }
 
-// A day: six daily quests, three at a time ("Quests completed: 0/6" and
-// three daily quests on the screenshots); a claimed one makes room for the
-// next.
+// A day: six daily quests, all of them shown at once ("Quests completed:
+// 0/6"); a claimed one leaves the list.
 const (
 	questsPerDay     = 6
-	questsConcurrent = 3
+	questsConcurrent = 6
 )
 
 func (q questDef) json() map[string]any {

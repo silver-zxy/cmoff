@@ -231,10 +231,8 @@ Fifth test: still the old quest again, without rewards. Two causes:
 
 ## Daily quest pool
 
-- QUEST_SETTINGS: six daily quests a day, three at a time, one reroll
-  ("Quests completed: 0/6" and three daily quests on the screenshots).
-  The server hands out three; a claim makes room for the next, which comes
-  with the next home.
+- QUEST_SETTINGS: six daily quests a day, all shown at once, one reroll
+  ("Quests completed: 0/6"). A claimed quest leaves the list.
 - The pool: seven quests a day out of the catalog (six and one for the
   reroll). The home's pool state lists every index but the reroll's as
   taken, the ones still to come too, so the client's reroll (0x785fac,
@@ -243,7 +241,9 @@ Fifth test: still the old quest again, without rewards. Two causes:
 - Kinds the server counts: PlayGameMode (duels, rumbles), PlayWithUnit (2,
   state: VInt RequirementMini, 0 none), WinWithUnit (1, state: Bool
   UseRoundWins, VInt RequirementMini; a duel won or a Rumble in the top 4), WinRumble, MetaResourceGained (25, state: VInt resource row + 1;
-  RankPoints, "Win N Trophies", ranked trophies won), MetaSeasonRoadLevel.
+  RankPoints, "Win N Trophies", ranked trophies won; out of the pool since
+  0075: a quest of that kind crashed the quest screen's hint, 0x834d64,
+  which found no resource), MetaSeasonRoadLevel.
   The data references are written by 0x37cc70: VInt row + 1, 0 for none.
 - The home reads its quests with flag 0 (0x4bce10 → 0x3b3af4): with the
   quest's tail (+0x30 …) and the states' short form. WinWithUnit's Bool

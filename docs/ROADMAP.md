@@ -68,10 +68,11 @@ the phone before the next.
 ### A3. Quests as on the screenshots
 
 Done in 0065 (to test):
-- Daily: **6 a day, 3 at a time**, 1 reroll; rewards the game's chests:
+- Daily: **6 a day, all at once** (0075), 1 reroll; rewards the game's chests:
   quest_Daily_Small (1 Pony Fuel, 10–30 gold) or 100 gold and 1 fuel.
 - Kinds the server can count: play duels / rumbles / matches, win matches,
-  finish a Rumble first, win N trophies, advance on the road N times.
+  finish a Rumble first, advance on the road N times ("win N trophies"
+  crashed the quest screen and is out, 0075).
 
 Still to do:
 - Battle kinds (win N rounds, knock out N, win without rerolling, 3:0,
