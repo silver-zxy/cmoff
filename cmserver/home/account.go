@@ -25,6 +25,10 @@ type Account struct {
 	NameSet bool `json:"name_set"`
 	// Skins: selected skin (global id) per mini/hero (collectible id).
 	Skins map[int32]int32 `json:"skins,omitempty"`
+	// OwnedSkins: the extra skins the player has (global ids, skins.go);
+	// SkinsLocked: the skins were locked as in the original once (0088)
+	OwnedSkins  []int32 `json:"owned_skins,omitempty"`
+	SkinsLocked bool    `json:"skins_locked,omitempty"`
 	// Trophies (RankPoints) from ranked battles, see ranked.go.
 	Trophies     int32 `json:"trophies"`
 	BestTrophies int32 `json:"best_trophies"`
@@ -61,8 +65,10 @@ type Account struct {
 	// characters.csv row, how many of a mini's quests were claimed
 	MiniQuests []Quest         `json:"mini_quests,omitempty"`
 	MiniSteps  map[int32]int32 `json:"mini_steps,omitempty"`
-	Season     SeasonState     `json:"season"`
-	Purchases  []Purchase      `json:"purchases,omitempty"`
+	// Clashmas: the Clashmas quest group (clashmas.go)
+	Clashmas  ClashmasState `json:"clashmas"`
+	Season    SeasonState   `json:"season"`
+	Purchases []Purchase    `json:"purchases,omitempty"`
 	// StarterChests: the starting chests have been given (chests.go)
 	StarterChests bool             `json:"starter_chests,omitempty"`
 	Collection    map[int32]*Owned `json:"collection,omitempty"`
@@ -247,6 +253,7 @@ func (a *Account) ownHome() ownHomeData {
 	h.heroExtra = globalID(classSupportHero, a.Heroes[a.Selected])
 	h.skinStore = true
 	h.skinSel = a.Skins
+	h.skinOwned = a.ownedSkinSet()
 	m.avatar.name = a.Name
 	m.avatar.nameSet = a.NameSet
 	// New players play the tutorial when Tutorial is on (tutorial flags 0).
@@ -286,7 +293,13 @@ func (a *Account) ownHome() ownHomeData {
 		a.refreshQuests()
 		a.refreshMiniQuests()
 		h.events = append(h.events, a.miniChainEvents()...)
-		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken(), mini: a.MiniQuests}
+		a.refreshClashmas()
+		groups := clashmasOn() && a.Progression
+		if groups {
+			h.events = append(h.events, clashmasLiveEvent())
+		}
+		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken(), mini: a.MiniQuests,
+			clashmas: a.Clashmas, groups: groups}
 		// the server time, unix seconds: the tail's second VInt (msg +0x9c,
 		// 0x48b2e4) becomes the logic's time base (+0x1d4 via 0x85f100,
 		// 0x327c54; now = ticks/20 + base, 0x4df510). At 0 the events'
@@ -320,6 +333,9 @@ func (a *Account) SelectSkin(skin int32) {
 		a.Skins = map[int32]int32{}
 	}
 	if extra {
+		if !a.ownsSkin(skin) {
+			return
+		}
 		a.Skins[owner] = skin
 	} else {
 		delete(a.Skins, owner)

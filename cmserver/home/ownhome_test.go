@@ -100,7 +100,7 @@ func decode(body []byte) (ownHomeData, error) {
 		}
 	}
 	// up to the season manager (its empty form is four VInt 0)
-	r.Skip(fixedLen(func(w *proto.Writer) { encodeHomeEnd(w, false, nil, nil) }) - 4)
+	r.Skip(fixedLen(func(w *proto.Writer) { encodeHomeEnd(w, false, nil, nil, nil) }) - 4)
 	m.home.season = decodeSeason(r)
 	m.home.chests = decodeChests(r)
 	// The manager's bool and the bool after it share a byte, with the last
@@ -236,7 +236,7 @@ func TestSkinStoreIndex(t *testing.T) {
 	}
 	read := func(sel map[int32]int32) map[int32][]int32 { // owner -> [idx, skins...]
 		w := proto.NewWriter()
-		encodeSkinStore(w, sel)
+		encodeSkinStore(w, sel, nil)
 		r := proto.NewReader(w.Bytes())
 		out := map[int32][]int32{}
 		for n := r.VInt(); n > 0; n-- {
@@ -417,11 +417,35 @@ func decodeQuests(r *proto.Reader) []Quest {
 		}
 		lastChains = append(lastChains, chainState{ev, step, q})
 	}
-	for i := 0; i < 2; i++ {
-		r.VInt()
+	// the group quests (+0xa0) and the groups' state
+	lastGroupQuests, lastGroups = nil, nil
+	for n := r.VInt(); n > 0 && r.Err() == nil; n-- {
+		lastGroupQuests = append(lastGroupQuests, decodeQuest(r))
+	}
+	for n := r.VInt(); n > 0 && r.Err() == nil; n-- {
+		g := groupState{event: r.VInt(), done: r.VInt()}
+		for m := r.VInt(); m > 0; m-- {
+			g.taken = append(g.taken, r.VInt())
+		}
+		for m := r.VInt(); m > 0; m-- {
+			g.claimed = append(g.claimed, r.VInt())
+		}
+		lastGroups = append(lastGroups, g)
 	}
 	return out
 }
+
+type groupState struct {
+	event, done    int32
+	taken, claimed []int32
+}
+
+// lastGroupQuests, lastGroups: the group quests and states decodeQuests
+// read last.
+var (
+	lastGroupQuests []Quest
+	lastGroups      []groupState
+)
 
 type chainState struct {
 	event, step int32

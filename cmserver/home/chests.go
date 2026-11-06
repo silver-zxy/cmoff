@@ -140,6 +140,11 @@ func (a *Account) addFragments(r *Reward, id, n int32) {
 	if n <= 0 {
 		return
 	}
+	if id/1_000_000 == classSkin {
+		a.ownSkin(id)
+		r.Skins = append(r.Skins, id)
+		return
+	}
 	a.entry(id).Fragments += n
 	if r.Fragments == nil {
 		r.Fragments = map[int32]int32{}
@@ -310,8 +315,9 @@ func (a *Account) CatchUp() string {
 		coins = a.excessToCoins(r)
 	}
 	starter := a.catchUpStarter(r)
+	locked := a.lockSkins()
 	a.Unlock()
-	if len(r.Unlocked) == 0 && len(r.Upgraded) == 0 && !starter && coins == 0 {
+	if len(r.Unlocked) == 0 && len(r.Upgraded) == 0 && !starter && coins == 0 && !locked {
 		return ""
 	}
 	if err := a.Save(); err != nil {
@@ -319,6 +325,9 @@ func (a *Account) CatchUp() string {
 	}
 	if starter {
 		return "caught up with the start (starting chests, gold, gems): " + r.String()
+	}
+	if locked && len(r.Unlocked) == 0 && len(r.Upgraded) == 0 && coins == 0 {
+		return fmt.Sprintf("caught up: skins locked as in the original, %d owned", len(a.OwnedSkins))
 	}
 	if coins > 0 && len(r.Unlocked) == 0 && len(r.Upgraded) == 0 {
 		return fmt.Sprintf("caught up: %d fragments past max level became Crystal Coins (%d now)", coins, a.CrystalCoins)

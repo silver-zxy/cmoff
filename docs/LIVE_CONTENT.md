@@ -32,7 +32,7 @@ Types (0x4ccac0): `SHOP_LAYOUT`, `QUEST_POOL`, `QUEST_CHAIN`,
 | QUEST_POOL | LogicLiveQuestPoolData (0x6b2b6c) | Pool, CycleCategory (Daily/Weekly), DailyLimit, CycleLimit, PoolPriority, DuplicateAllowed, LevelLimitLow/High |
 | one quest | LogicLiveQuestData (0x5887fc) | QuestTextTID, MinProgress, MaxProgress, Rewards, ClaimRestriction, PromotionToken, InstanceTag; kinds: WinRumble, WinWithUnit, PlayGameMode, UpgradeUnit, MetaOpenChest, MetaPlayerLevel, MetaSeasonRoadLevel, … (LogicLiveQuest* classes) |
 | QUEST_CHAIN | (0x71d454) | Chain, Category (Competitive/Season/Tutorial), LoopWhenDone, LevelLimitLow/High |
-| QUEST_GROUP | LogicLiveQuestGroupData (0x608d94) | TitleTID, Quests, PickLimit, PickRandomly, Milestones, QuestsDoneReq, Chest, LevelLimitLow/High |
+| QUEST_GROUP | LogicLiveQuestGroupData (0x608d94) | TitleTID, Quests, PickLimit, PickRandomly, Milestones (QuestsDoneReq, Chest by name), LevelLimitLow/High; ours: the Clashmas quests (clashmas.go, 0087) |
 | quest settings | LogicLiveGlobalQuestSettings (0x919330) | Enabled, MaxConcurrentQuests, MaxConcurrentDailyQuests, MaxTotalDailyQuests, DailyQuestRerollLimit, …Weekly… |
 | SEASON_DATA | LogicLiveSeasonData (0x49c3ac) | SeasonName, SeasonIndex, BasePass, PremiumPass, PassValue, PassInfoTID, ShowEndTime, HasInfoPage, InfoPageConfig, LevelLimitLow/High |
 | SHOP_LAYOUT | LogicLiveShopLayoutData (0x46e118) | Modules (shop_modules.csv), LevelLimitLow/High |
@@ -344,3 +344,28 @@ Fifth test: still the old quest again, without rewards. Two causes:
   the hook points the npc at it (`choose_board`: item n of the locations table
   `*(libg+0x10807c0)`; not the CSV row, which is line 2n) and back to
   its own board in Bronze (0072).
+
+## Quest groups (0087)
+
+- The quest manager holds a group's quests in their own list (+0xa0,
+  decoder 0x4bd6d0, after the chains' state) and per group its state:
+  VInt event id (+0x60), VInt quests done (+0x70), the indices handed out
+  (+0x80) and the milestones claimed (+0x90), each an int list (encoder
+  0x31b9b4, decoder 0x4bd7d4).
+- The quest screen puts a quest in a section by its category (0x5b5750):
+  1 season_quest, 2 daily_quest, 3 tutorial_quest (MINI QUESTS), 4
+  weekly_quest, 5 competitive_quest, 6 timed_event_quest (the block under
+  a quest group's header); other values fall to the tutorial's. Group
+  quests take 6 (0089).
+- A battle copies only the active and chain quests (0x4f6854: +0x30,
+  +0x50), not the group's: the server counts those (clashmasProgress, with
+  the quest's unit in the selected deck or as the selected hero).
+- A claim (503) counts as done (0x5ca20c) and the client hands out the
+  next quest (0x5ca2a4 -> 0x9a5554); the server hands out the lowest index
+  not yet taken, as with PickRandomly false.
+- LogicClaimQuestMilestoneCommand 508: base, VInt event, VInt milestone
+  (0x466644); the client checks done >= QuestsDoneReq (0x91d114) and not
+  yet claimed (0x84bfcc). The server gives the milestone's chest.
+- The live quest data of PlayWithUnit / WinWithUnit takes its unit as
+  PieceRequirementType MiniFromList + UnitList (table 6 names: characters
+  then characters_heroes, so a hero such as HeroRoyalChampion too).

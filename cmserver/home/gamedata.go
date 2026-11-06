@@ -68,7 +68,8 @@ type GameData struct {
 	// miniCost: a mini's elixir cost by seasonal row (characters.csv
 	// ManaCost of the row's Season1 character)
 	miniCost map[int32]int32
-	// charName: characters.csv names by row (the quests' RequirementMini)
+	// charName: table 6 names by row: characters.csv, then
+	// characters_heroes.csv (the quests' RequirementMini)
 	charName map[int32]string
 }
 
@@ -120,6 +121,12 @@ func LoadGameData(apk string) (*GameData, error) {
 		d.charName = map[int32]string{}
 		for i, r := range chars.rows {
 			d.charName[int32(i)] = chars.get(r, "Name")
+		}
+		// table 6 goes on with the heroes (characters_heroes.csv)
+		if heroes, err := readCSV(z, "assets/csv_logic/characters_heroes.csv"); err == nil {
+			for i, r := range heroes.rows {
+				d.charName[int32(len(chars.rows)+i)] = heroes.get(r, "Name")
+			}
 		}
 	}
 	return d, nil
