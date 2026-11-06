@@ -195,11 +195,37 @@ func (a *Account) questsAfterBattle(mode, place int32) {
 	})
 	a.questProgress(questPlayWithUnit, 1, nil)
 	if won(mode, place) {
-		a.questProgress(questWinWithUnit, 1, nil)
+		a.questProgress(questWinWithUnit, 1, func(d questDef) bool {
+			r, _ := d.Own["UseRoundWins"].(bool)
+			return !r // rounds: the client counts them
+		})
 	}
 	if mode == ModeRumble && place == 1 { // "Finish as the Champion"
 		a.questProgress(questWinRumble, 1, nil)
 	}
+}
+
+// QuestsFromClient takes the progress the client counted itself (the hook
+// reads it after a battle: battle kinds such as knock outs, rounds or 3:0
+// only the client sees). A quest only goes up, to its target at most. The
+// caller holds the lock. It returns what changed, for the log.
+func (a *Account) QuestsFromClient(progress [][2]int32) (changed []string) {
+	a.refreshQuests()
+	pool := todaysQuests()
+	for _, p := range progress {
+		for i := range a.Quests {
+			q := &a.Quests[i]
+			if q.ID != p[0] || q.Claimed || int(q.Index) >= len(pool) {
+				continue
+			}
+			d := pool[q.Index]
+			if v := min(p[1], d.Target); v > q.Progress {
+				q.Progress = v
+				changed = append(changed, fmt.Sprintf("#%d %s %d/%d", q.ID, d.Kind, v, d.Target))
+			}
+		}
+	}
+	return changed
 }
 
 // questsTrophies: trophies won count for "Win N Trophies".
@@ -356,8 +382,11 @@ func (d questDef) encodeState(w *proto.Writer) {
 		r, _ := d.Own["UseRoundWins"].(bool)
 		w.Bool(r)
 		w.VInt(0)
-	case questPlayWithUnit:
-		w.VInt(0) // RequirementMini: none (0x5190c8)
+	case questPlayWithUnit, questUpgradeUnit, questTotalKOs, questKeywordClash, questEndRoundAlive:
+		w.VInt(0) // RequirementMini, a table 6 reference: none (0x5190c8, 0x4709ec, 0x4c8eac, 0x5d031c, 0x946038)
+	case questWinDuelPerfect, questWinGameNoReroll, questWinRoundNoDeath:
+		// nothing in the short form (a Bool only in the other, 0x8f7258,
+		// 0x92fd04; 0x792064 none)
 	case questResourceGained:
 		// Resource: a resources reference, row + 1 (0x473414)
 		w.VInt(resourceRankPoints + 1)

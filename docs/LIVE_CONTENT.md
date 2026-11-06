@@ -260,8 +260,26 @@ Fifth test: still the old quest again, without rewards. Two causes:
   WinRumble 19, WinGameNoReroll 20, WinRoundNoDeath 21, WinWithUnitList 22,
   AbilityHitInOneGame 23, MetaSeasonRoadLevel 24, MetaResourceGained 25,
   PlayGameMode 26 (state classes by 0x506b4c, their writers at vtable
-  +0x18). The battle kinds (rounds, knock outs, rerolls, 3:0) need what
-  happened in the battle, which the hook does not report yet.
+  +0x18).
+- The client counts its quests itself, the battle kinds too
+  (LogicQuestKnockOutEventHandler, …WinEventHandler, …WinRoundNoDeath-
+  Handler, …WinDuelPerfectHandler, …WinGameNoRerollHandler,
+  …KeywordClashEventHandler, …UpgradeEventHandler, …). Our server's next
+  home would put its own counts back, so after every bot battle the hook
+  reads the client's active quests (home `*(*(GameMode+0x68)+0x48)`, quest
+  manager +0x180, list +0x30 / count +0x3c, quest id +0x38, progress +0x3c)
+  and sends them (result frame mode 11: count, then int32 id / progress
+  pairs); the server takes the higher value (`QuestsFromClient`, 0076).
+- Battle kinds in the pool (0076): win 9 rounds (WinWithUnit with
+  UseRoundWins, not counted by the server), knock out 15 (TotalKOs), win
+  without rerolling (20), win rounds without losing a mini (21), 3:0 in a
+  duel (18), Clash abilities (5), upgrades in battle (UpgradeUnit 3).
+  States in the home's short form: VInt RequirementMini for 3, 4, 5, 7;
+  nothing for 18, 20, 21.
+- RequirementMini (mini quests, "using <unit>") is a reference into data
+  table 6 (`*(libg+0x1080778)`, 0x6d3e64 / 0x60c69c), which no CSV is
+  loaded into; the hook logs what it holds (0076) before quests name a
+  unit.
 
 ## Boards (`home/boards.go`)
 

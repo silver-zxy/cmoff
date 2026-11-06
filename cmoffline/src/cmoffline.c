@@ -589,8 +589,83 @@ static void report_result_ex(int mode, int place, int extra) {
 
 static void report_result(int mode, int place) { report_result_ex(mode, place, 0); }
 
+/* Quest progress. The client counts its quests itself, battle ones too
+ * (LogicQuest*EventHandler: knock outs, rounds, 3:0, rerolls, Clash,
+ * upgrades), but the server's next home would put its own counts back. So
+ * after a battle the hook sends the server the client's progress:
+ *   home        = *(*(GameMode + 0x68) + 0x48)   (0x8223c4; commands 0x68da08)
+ *   quests      = *(home + 0x180)                (0x975f88)
+ *   active list = quests +0x30 (quest *[]), count +0x3c (0x59b4a4)
+ *   quest       +0x38 id (0x3add64), +0x3c progress
+ * frame: mode HOOK_QUEST_PROGRESS, count, then (id, progress) as big-endian
+ * int32 pairs. */
+#define HOOK_QUEST_PROGRESS 11         /* cmserver hookQuestProgress */
+#define LOGIC_MODE_HOME     0x48
+#define HOME_QUESTS         0x180
+#define QUESTS_ACTIVE       0x30
+#define QUESTS_ACTIVE_N     0x3c
+#define QUEST_ID            0x38
+#define QUEST_PROGRESS      0x3c
+#define QUESTS_MAX          16
+
+static void report_quests(uint8_t *gm) {
+    uint8_t *mode = peek_ptr(gm, GM_MODE);
+    uint8_t *home = peek_ptr(peek_ptr(mode, LOGIC_BATTLE_OWNER), LOGIC_MODE_HOME);
+    uint8_t *qm = peek_ptr(home, HOME_QUESTS);
+    uint8_t *list = peek_ptr(qm, QUESTS_ACTIVE);
+    int n = peek_int(qm, QUESTS_ACTIVE_N, -1);
+    if (!list || n < 0 || n > 64) { LOG("quests: not readable (%d)", n); return; }
+    uint8_t f[7 + 2 + QUESTS_MAX * 8];
+    int len = 2, k = 0;
+    char line[256];
+    int ll = 0;
+    for (int i = 0; i < n && k < QUESTS_MAX; i++) {
+        uint8_t *q = peek_ptr(list, i * 8);
+        int32_t id = peek_int(q, QUEST_ID, -1), pr = peek_int(q, QUEST_PROGRESS, -1);
+        if (id < 0 || pr < 0) continue;
+        uint8_t *o = f + 7 + len;
+        o[0] = id >> 24; o[1] = id >> 16; o[2] = id >> 8; o[3] = id;
+        o[4] = pr >> 24; o[5] = pr >> 16; o[6] = pr >> 8; o[7] = pr;
+        len += 8;
+        k++;
+        if (ll < (int)sizeof line - 24) ll += snprintf(line + ll, sizeof line - ll, " #%d %d", id, pr);
+    }
+    LOG("quests: client progress%s", k ? line : " (none)");
+    f[0] = HOOK_BATTLE_RESULT >> 8; f[1] = HOOK_BATTLE_RESULT & 0xff;
+    f[2] = len >> 16; f[3] = len >> 8; f[4] = len; f[5] = 0; f[6] = 0;
+    f[7] = HOOK_QUEST_PROGRESS; f[8] = (uint8_t)k;
+    struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = htons(GAME_PORT) };
+    if (inet_pton(AF_INET, REDIRECT_TO, &a.sin_addr) != 1) return;
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (fd < 0) return;
+    struct timeval tv = { 2, 0 };
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
+    int ok = connect(fd, (struct sockaddr *)&a, sizeof a) == 0 && write(fd, f, 7 + len) == 7 + len;
+    close(fd);
+    if (!ok) LOG("quests: could not reach the server");
+}
+
+/* Diagnostics for mini quests: their unit (RequirementMini) is a reference
+ * into data table 6 (0x6d3e64 / 0x60c69c, *(libg+0x1080778)), which no CSV
+ * is loaded into. Log once what it holds. */
+#define LIBG_TABLE6 0x1080778
+static void log_table6(void) {
+    uint8_t *t = *(uint8_t **)G(LIBG_TABLE6);
+    if (!t) { LOG("table 6: none"); return; }
+    void **vt = *(void ***)t;
+    int n = ((int (*)(void *))vt[0x30 / 8])(t);
+    char line[256];
+    int ll = 0;
+    for (int i = 0; i < n && i < 40 && ll < (int)sizeof line - 24; i++) {
+        uint8_t *it = ((uint8_t *(*)(void *, int))vt[0x38 / 8])(t, i);
+        uint8_t *row = it ? *(uint8_t **)(it + 0x10) : NULL;
+        ll += snprintf(line + ll, sizeof line - ll, " %d:%d", i, row ? *(int32_t *)(row + 8) : -1);
+    }
+    LOG("table 6: %d items, CSV rows%s", n, line);
+}
+
 /* Called every tick with the game state. */
-static void watch_result(int state) {
+static void watch_result(uint8_t *gm, int state) {
     static int reported, ended, seen, checked;
     if (!checked++) {
         uint8_t probe;
@@ -619,6 +694,7 @@ static void watch_result(int state) {
     if (!place) return;
     reported = 1;
     report_result(battle_mode, place);
+    report_quests(gm);
 }
 
 /* Tutorial (a new player's, signalled by the server with mode 1). The
@@ -795,7 +871,11 @@ static void battles_main(void) {
             LOG("game state %d -> %d (offline flag %d)", last_state, state, *offline);
             last_state = state;
         }
-        watch_result(state);
+        watch_result(gm, state);
+        {
+            static int table6_logged;
+            if (state == 4 && !table6_logged++) log_table6();
+        }
         watch_tutorial(gm, state);
         log_tutorial_flags(gm);
 

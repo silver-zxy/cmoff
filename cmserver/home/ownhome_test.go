@@ -373,7 +373,8 @@ func decodeQuests(r *proto.Reader) []Quest {
 			case questMetaUpgrade:
 				r.Bool()
 				r.Bool()
-			case questPlayGameMode, questPlayWithUnit, questResourceGained:
+			case questPlayGameMode, questPlayWithUnit, questResourceGained,
+				questUpgradeUnit, questTotalKOs, questKeywordClash, questEndRoundAlive:
 				r.VInt()
 			case questWinWithUnit:
 				r.Bool()

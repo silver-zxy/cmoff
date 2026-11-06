@@ -384,3 +384,47 @@ func TestDailyQuests(t *testing.T) {
 		t.Fatalf("next day %+v", a.Quests)
 	}
 }
+
+// The client's own progress (battle kinds) comes from the hook: up only, to
+// the target at most; claimed and unknown quests stay as they are.
+func TestQuestsFromClient(t *testing.T) {
+	catalog := questCatalog
+	defer func() { questCatalog = catalog }()
+	ko := questDef{"TotalKOs", questTotalKOs, "TID_CHRONOS_QUESTS_TOTALKOS", 15, rewardSmall, map[string]any{}}
+	rounds := questDef{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINROUNDSWITHUNIT", 9, rewardBig, map[string]any{"UseRoundWins": true}}
+	questCatalog = []questDef{ko, rounds, playDuels(3, rewardSmall), playRumbles(2, rewardSmall),
+		{"WinRoundNoDeath", questWinRoundNoDeath, "TID_CHRONOS_QUESTS_WINROUNDNODEATH", 2, rewardSmall, nil},
+		{"WinGameNoReroll", questWinGameNoReroll, "TID_CHRONOS_QUESTS_WINGAMENOREROLL", 1, rewardSmall, nil},
+		{"WinDuelPerfect", questWinDuelPerfect, "TID_CHRONOS_QUESTS_WINDUELPERFECT", 1, rewardBig, nil}}
+	day := time.Date(2026, 11, 4, 12, 0, 0, 0, time.Local)
+	now = func() time.Time { return day }
+	defer func() { now = time.Now }()
+	a := NewAccount()
+	a.StartProgression()
+	a.refreshQuests()
+	ids := map[string]int32{}
+	for _, q := range a.Quests {
+		ids[questCatalog[q.Index].Text] = q.ID
+	}
+	// a won duel does not count for "win 9 rounds" on the server
+	a.BattleResult(ModeDuel, 1, false)
+	if q := a.Quests[1]; q.Progress != 0 {
+		t.Fatalf("rounds counted by the server %+v", q)
+	}
+	changed := a.QuestsFromClient([][2]int32{{ids["TID_CHRONOS_QUESTS_TOTALKOS"], 7}, {ids["TID_CHRONOS_QUESTS_WINROUNDSWITHUNIT"], 99}, {999, 5},
+		{ids["TID_CHRONOS_QUESTS_PLAY_DUEL"], 0}})
+	if len(changed) != 2 || a.Quests[0].Progress != 7 || a.Quests[1].Progress != 9 || a.Quests[2].Progress != 1 {
+		t.Fatalf("%v %+v", changed, a.Quests)
+	}
+	// claimed stays claimed and unchanged
+	a.ClaimQuest(&Reward{}, a.Quests[1].ID)
+	if c := a.QuestsFromClient([][2]int32{{a.Quests[1].ID, 3}}); len(c) != 0 || a.Quests[1].Progress != 9 {
+		t.Fatalf("claimed changed %v", c)
+	}
+	// the home writes all the kinds
+	h := a.ownHome()
+	h.home.skinStore = false
+	if m, err := decode(h.encode()); err != nil || len(m.home.quests.quests) != 5 {
+		t.Fatalf("%v %+v", err, m.home.quests.quests)
+	}
+}

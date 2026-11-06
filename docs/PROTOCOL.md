@@ -156,7 +156,9 @@ connection of its own, one plain frame:
     id 19999 (not a game message), length 2, version 0, body: u8 mode, u8 place
 
 `place`: duel 1 = won, 2 = lost; Rumble 1, 2, 3 (3rd–4th), 5 (5th–8th);
-0 = left before the end (worst place). The server applies it to the battle
+0 = left before the end (worst place). After it the hook sends a second
+frame, mode 11: count, then (int32 quest id, int32 progress) pairs, the
+client's own quest progress (big-endian). The server applies it to the battle
 it started last. Ranked battles (StartMatchmake's ranked bool) get the rank
 points (trophies) of the league's rank reward chests (leagues.json
 "RewardsCompetitive", chests.json RankPoints), e.g.

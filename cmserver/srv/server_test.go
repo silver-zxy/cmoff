@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"net"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -207,5 +208,28 @@ func TestTutorialDoneReport(t *testing.T) {
 	c.Close()
 	if !acc.TutorialPending || acc.TutorialFlags != 0x200 || acc.Heroes[0] != 12 {
 		t.Fatalf("after the hero: pending %v flags %#x hero %d", acc.TutorialPending, acc.TutorialFlags, acc.Heroes[0])
+	}
+}
+
+// The hook's quest progress frame: count, then (id, progress) pairs.
+func TestQuestProgressReport(t *testing.T) {
+	key, _ := pepper.GenerateKey()
+	acc, err := home.LoadAccount(filepath.Join(t.TempDir(), "accounts.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc.SetProgression("fresh")
+	acc.OwnHomeData() // hands out today's quests
+	s := New(key, acc, Options{BattleOnline: true})
+	id := acc.Quests[0].ID
+	c, sc := net.Pipe()
+	done := make(chan struct{})
+	go func() { s.handle(sc); close(done) }()
+	p := []byte{hookQuestProgress, 2, 0, 0, 0, byte(id), 0, 0, 0, 1, 0, 0, 3, 0xe7, 0, 0, 0, 5}
+	_ = proto.WriteFrame(c, &proto.Frame{ID: HookBattleResult, Payload: p})
+	<-done
+	c.Close()
+	if acc.Quests[0].Progress != 1 {
+		t.Fatalf("quest %+v", acc.Quests[0])
 	}
 }

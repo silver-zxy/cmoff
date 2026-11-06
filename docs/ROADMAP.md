@@ -76,8 +76,9 @@ Done in 0065 (to test):
 
 Still to do:
 - Battle kinds (win N rounds, knock out N, win without rerolling, 3:0,
-  Clash abilities): the hook has to report what happened in the battle
-  (rounds, knock outs, rerolls; to find in the client's battle).
+  rounds without losing a mini, Clash, upgrades in battle): the client
+  counts them, the hook reports its progress after each battle (0076, to
+  test).
 - Mini quests: WinWithUnit with RequirementMini (a characters reference),
   quest_Daily_Mini (1 fuel and a fragment); their own section in the
   quest screen ("MINI QUESTS", category to find).

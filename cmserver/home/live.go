@@ -125,6 +125,13 @@ var (
 const (
 	questWinWithUnit      int32 = 1
 	questPlayWithUnit     int32 = 2
+	questUpgradeUnit      int32 = 3
+	questTotalKOs         int32 = 4
+	questKeywordClash     int32 = 5
+	questEndRoundAlive    int32 = 7
+	questWinDuelPerfect   int32 = 18
+	questWinGameNoReroll  int32 = 20
+	questWinRoundNoDeath  int32 = 21
 	questMetaUpgrade      int32 = 9
 	questWinRumble        int32 = 19
 	questSeasonRoadLevel  int32 = 24
@@ -152,6 +159,24 @@ var questCatalog = []questDef{
 		rewardBig, map[string]any{"UseRoundWins": false}},
 	{"WinRumble", questWinRumble, "TID_CHRONOS_QUESTS_WINRUMBLE", 1,
 		rewardBig, nil},
+	// Battle kinds: the client counts them (LogicQuest*EventHandler), the
+	// hook reports its progress after the battle (QuestsFromClient). The
+	// ones on the screenshots: win 9 rounds (100 gold), knock out 15 (10-30),
+	// win 1 match without rerolling (10-30).
+	{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINROUNDSWITHUNIT", 9,
+		rewardBig, map[string]any{"UseRoundWins": true}},
+	{"TotalKOs", questTotalKOs, "TID_CHRONOS_QUESTS_TOTALKOS", 15,
+		rewardSmall, map[string]any{}},
+	{"WinGameNoReroll", questWinGameNoReroll, "TID_CHRONOS_QUESTS_WINGAMENOREROLL", 1,
+		rewardSmall, nil},
+	{"WinRoundNoDeath", questWinRoundNoDeath, "TID_CHRONOS_QUESTS_WINROUNDNODEATH", 2,
+		rewardSmall, nil},
+	{"WinDuelPerfect", questWinDuelPerfect, "TID_CHRONOS_QUESTS_WINDUELPERFECT", 1,
+		rewardBig, nil},
+	{"UseKeywordClash", questKeywordClash, "TID_CHRONOS_QUESTS_USEKEYWORDCLASH", 10,
+		rewardSmall, map[string]any{}},
+	{"UpgradeUnit", questUpgradeUnit, "TID_CHRONOS_QUESTS_UPGRADEUNIT", 5,
+		rewardSmall, map[string]any{}},
 	// Not "Win N Trophies" (MetaResourceGained): a quest of that kind the
 	// client made from the pool crashed the quest screen (its hint,
 	// 0x834d64, found no resource), 0075.
