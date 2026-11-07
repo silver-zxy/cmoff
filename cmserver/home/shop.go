@@ -29,9 +29,17 @@ import (
 //     500 / 750 gold by the mini's elixir cost (2 / 3 / 4);
 //   - Heroes: three offers a day, 25 fragments each, five times each, for
 //     100 gems.
+//   - Clashmas Special (XmasModule): Jolly Barbarian King 159 gems,
+//     Helpful Mini P.E.K.K.A 99 gems;
+//   - Clashmas Skins (BundleModule): Gift Giant Skeleton, Sparkle Archer,
+//     Snowler Bowler; it cost real money, ours is free;
+//   - Crystal Coins Skin (SkinModule): Crystal P.E.K.K.A 100, Fabulous
+//     Prince 600 Crystal Coins (PromotionToken).
 // A new shop every day (UTC), its own event id per day so the limits start
-// anew. The chests are the game's shop chests (shop_unit_*,
-// shop_miniHero_*_25). Left out: gem packs and bundles (real money).
+// anew; a skin owned counts as bought in every day's shop (the home's
+// purchases), so it stays "Purchased". The chests are the game's shop
+// chests (shop_unit_*, shop_miniHero_*_25, shop_skin_*). Left out: gem
+// packs and the other bundles (real money).
 
 // sourceShop: a chest bought in the shop (0x932bf4).
 const sourceShop int32 = 4
@@ -41,10 +49,15 @@ const shopEventBase int32 = 3_000_000
 
 type shopItem struct {
 	Chest    int32
-	Resource string // "Gold" or "Diamonds"
+	Resource string // "Gold", "Diamonds" or "PromotionToken"
 	Cost     int32
 	Limit    int32
+	// More: further chests of the item (a bundle); Large: a large button
+	More  []int32
+	Large bool
 }
+
+func (it shopItem) chests() []int32 { return append([]int32{it.Chest}, it.More...) }
 
 type shopModule struct {
 	Name, Title string
@@ -106,7 +119,7 @@ func shopMiniOffers() []shopItem {
 		if cost == 0 {
 			cost = 3
 		}
-		out = append(out, shopItem{id, "Gold", shopMiniGold(cost), shopMiniLimit})
+		out = append(out, shopItem{Chest: id, Resource: "Gold", Cost: shopMiniGold(cost), Limit: shopMiniLimit})
 	}
 	return out
 }
@@ -127,12 +140,85 @@ func shopModules(day int32) []shopModule {
 	}
 	var heroItems []shopItem
 	for _, i := range rng.Perm(len(shopHeroChests))[:shopHeroesPerDay] {
-		heroItems = append(heroItems, shopItem{shopHeroChests[i], "Diamonds", shopHeroGems, shopHeroLimit})
+		heroItems = append(heroItems, shopItem{Chest: shopHeroChests[i], Resource: "Diamonds", Cost: shopHeroGems, Limit: shopHeroLimit})
 	}
 	return []shopModule{
 		{"BasicModule", "TID_CHRONOS_SHOP_TITLE_MINIS", miniItems},
 		{"BasicModule", "TID_CHRONOS_SHOP_TITLE_HEROES", heroItems},
+		{"XmasModule", "TID_CHRONOS_SHOP_MODULE_CLASHMAS_SKIN", []shopItem{
+			{Chest: chestSkinJolly, Resource: "Diamonds", Cost: 159, Limit: 1},
+			{Chest: chestSkinHelpful, Resource: "Diamonds", Cost: 99, Limit: 1},
+		}},
+		{"BundleModule", "TID_CHRONOS_SHOP_MODULE_SPECIALOFFER_CLASHMAS_SKIN", []shopItem{
+			{Chest: chestSkinGift, More: []int32{chestSkinSparkle, chestSkinSnowler},
+				Resource: "Diamonds", Cost: 0, Limit: 1, Large: true},
+		}},
+		{"SkinModule", "TID_CHRONOS_SHOP_MODULE_CRYSTAL_COIN", []shopItem{
+			{Chest: chestSkinCrystalPekka, Resource: "PromotionToken", Cost: 100, Limit: 1, Large: true},
+			{Chest: chestSkinFabulous, Resource: "PromotionToken", Cost: 600, Limit: 1, Large: true},
+		}},
 	}
+}
+
+// The skin chests (chests.json), each the one skin.
+const (
+	chestSkinCrystalPekka int32 = 127_000_259 // shop_skin_pekkaCrystal
+	chestSkinFabulous     int32 = 127_000_260 // shop_skin_PrinceFabulous
+	chestSkinJolly        int32 = 127_000_261 // shop_skin_BarbarianKingJolly
+	chestSkinHelpful      int32 = 127_000_262 // shop_skin_MiniPekkaWindup
+	chestSkinGift         int32 = 127_000_263 // shop_skin_GiantSkeletonGift
+	chestSkinSnowler      int32 = 127_000_265 // shop_skin_BowlerSnowler
+	chestSkinSparkle      int32 = 127_000_266 // shop_skin_ArcherSparkle
+)
+
+// chestSkins: the skins an item's chests give (global ids).
+func chestSkins(chests []int32) []int32 {
+	var out []int32
+	for _, id := range chests {
+		if c, ok := Data.Chest(id); ok {
+			for _, f := range c.FragList {
+				if f/1_000_000 == classSkin {
+					out = append(out, f)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// ownsItemSkins: the item gives skins and the player has all of them.
+func (a *Account) ownsItemSkins(it shopItem) bool {
+	skins := chestSkins(it.chests())
+	for _, s := range skins {
+		if !a.ownsSkin(s) {
+			return false
+		}
+	}
+	return len(skins) > 0
+}
+
+// shopPurchases: today's purchases, and every skin item whose skins the
+// player owns as bought (the client shows it "Purchased").
+func (a *Account) shopPurchases() []Purchase {
+	out := append([]Purchase(nil), a.todaysPurchases()...)
+	day := shopDay(now())
+	ev := shopEventBase + day
+	n := int32(0)
+	for _, m := range shopModules(day) {
+		for _, it := range m.Items {
+			if a.ownsItemSkins(it) {
+				bought := false
+				for _, p := range out {
+					bought = bought || p.Item == n
+				}
+				if !bought {
+					out = append(out, Purchase{ev, n})
+				}
+			}
+			n++
+		}
+	}
+	return out
 }
 
 // shopItemAt: an item by its number.
@@ -158,13 +244,17 @@ func shopLiveEvent() LiveEvent {
 	for _, m := range shopModules(day) {
 		var items []any
 		for _, it := range m.Items {
+			button := "SmallIcon"
+			if it.Large {
+				button = "LargeIcon"
+			}
 			items = append(items, map[string]any{
 				"ResourceType":     it.Resource,
 				"ResourceCost":     it.Cost,
 				"PurchaseLimit":    it.Limit,
-				"ButtonWidgetType": "SmallIcon",
+				"ButtonWidgetType": button,
 				"CountdownMode":    "EndTimer",
-				"Chests":           chestNames([]int32{it.Chest}),
+				"Chests":           chestNames(it.chests()),
 			})
 		}
 		modules = append(modules, map[string]any{
@@ -228,6 +318,9 @@ func (a *Account) BuyShopItem(r *Reward, event, item int32) (int32, string) {
 	if it.Limit > 0 && n >= it.Limit {
 		return 0, "sold out"
 	}
+	if a.ownsItemSkins(it) {
+		return 0, "skin already owned"
+	}
 	switch it.Resource {
 	case "Gold":
 		if a.Gold < it.Cost {
@@ -239,11 +332,18 @@ func (a *Account) BuyShopItem(r *Reward, event, item int32) (int32, string) {
 			return 0, "not enough gems"
 		}
 		a.Gems -= it.Cost
+	case "PromotionToken":
+		if a.CrystalCoins < it.Cost {
+			return 0, "not enough crystal coins"
+		}
+		a.CrystalCoins -= it.Cost
 	}
 	a.Purchases = append(a.Purchases, Purchase{event, item})
-	c, err := rollChest(a.random(), it.Chest)
-	if err != nil {
-		c = ChestContent{}
+	var c ChestContent
+	for _, id := range it.chests() {
+		if cc, err := rollChest(a.random(), id); err == nil {
+			c.add(cc)
+		}
 	}
 	a.pushChest(r, it.Chest, sourceShop, c)
 	if n := len(a.Chests); ChestsInHome && n > 0 && a.Chests[n-1].Index == a.ChestIndex {
