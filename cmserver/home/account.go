@@ -61,8 +61,10 @@ type Account struct {
 	// characters.csv row, how many of a mini's quests were claimed
 	MiniQuests []Quest         `json:"mini_quests,omitempty"`
 	MiniSteps  map[int32]int32 `json:"mini_steps,omitempty"`
-	Season     SeasonState     `json:"season"`
-	Purchases  []Purchase      `json:"purchases,omitempty"`
+	// Clashmas: the Clashmas quest group (clashmas.go)
+	Clashmas  ClashmasState `json:"clashmas"`
+	Season    SeasonState   `json:"season"`
+	Purchases []Purchase    `json:"purchases,omitempty"`
 	// StarterChests: the starting chests have been given (chests.go)
 	StarterChests bool             `json:"starter_chests,omitempty"`
 	Collection    map[int32]*Owned `json:"collection,omitempty"`
@@ -286,7 +288,13 @@ func (a *Account) ownHome() ownHomeData {
 		a.refreshQuests()
 		a.refreshMiniQuests()
 		h.events = append(h.events, a.miniChainEvents()...)
-		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken(), mini: a.MiniQuests}
+		a.refreshClashmas()
+		groups := clashmasOn() && a.Progression
+		if groups {
+			h.events = append(h.events, clashmasLiveEvent())
+		}
+		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken(), mini: a.MiniQuests,
+			clashmas: a.Clashmas, groups: groups}
 		// the server time, unix seconds: the tail's second VInt (msg +0x9c,
 		// 0x48b2e4) becomes the logic's time base (+0x1d4 via 0x85f100,
 		// 0x327c54; now = ticks/20 + base, 0x4df510). At 0 the events'

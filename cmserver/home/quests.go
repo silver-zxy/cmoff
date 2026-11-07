@@ -42,6 +42,7 @@ type Quest struct {
 const (
 	questCategoryMini  int32 = 3 // "Tutorial", the quest screen's MINI QUESTS (0x71d454)
 	questCategoryDaily int32 = 2
+	questCategoryGroup int32 = 1 // the group's quests have their own list
 	sourceQuest        int32 = 2
 )
 
@@ -185,6 +186,7 @@ func (a *Account) questProgress(kind int32, n int32, match func(questDef) bool) 
 		}
 		q.Progress = min(q.Progress+n, d.Target)
 	}
+	a.clashmasProgress(kind, n, match)
 }
 
 // questsAfterBattle: a finished battle counts for PlayGameMode and
@@ -280,7 +282,7 @@ func (a *Account) questsRoadTiers(n int32) {
 
 // ClaimQuest is 503: the quest's reward chest, made by the client.
 func (a *Account) ClaimQuest(r *Reward, id int32) bool {
-	if a.claimMiniQuest(r, id) {
+	if a.claimMiniQuest(r, id) || a.claimClashmasQuest(r, id) {
 		return true
 	}
 	a.refreshQuests()
@@ -403,7 +405,7 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 		w.Bool(true)
 		writeQuest(w, q, chain[q.Index], miniChainEvent(mini), step, questCategoryMini, questsEnd(d))
 	}
-	vints(w, 2) // the other lists (+0xa0, ...)
+	encodeGroups(w, s.clashmas, s.groups, questsEnd(d))
 }
 
 // writeQuest writes one quest (decoder 0x3b3af4, the short form).
@@ -457,6 +459,7 @@ func (a *Account) QuestSummary() string {
 			l = append(l, fmt.Sprintf("mini #%d %s %d/%d", q.ID, Data.CharName(miniCharRows[mini]), q.Progress, chain[q.Index].Target))
 		}
 	}
+	l = append(l, a.clashmasSummary()...)
 	return strings.Join(l, ", ")
 }
 
@@ -505,4 +508,7 @@ type questState struct {
 	rerolls int32
 	taken   []int32 // the pool's taken indices (questPoolTaken)
 	mini    []Quest // the mini quests (minis.go)
+	// clashmas: the Clashmas group (clashmas.go), sent if groups
+	clashmas ClashmasState
+	groups   bool
 }

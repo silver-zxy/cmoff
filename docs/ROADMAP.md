@@ -96,26 +96,27 @@ Also done:
   mini (0081).
 
 Still to do:
-- Clashmas quests: the quest group (event type 6) with the Candy Elf
-  (shop_skin_SpearGoblinElf, icon_xmas_quest); the 6 known:
+- Clashmas quests (0087, to test): Clashmas was a time, not a single
+  event: in it the Clashmas quest group was on (QUEST_GROUP, event 3001),
+  three of its quests at a time; 12 done unlock the Candy Elf (milestone,
+  508), after that the group goes on with Crystal Coins. Our snapshot
+  keeps Clashmas forever: the group never ends (its clock always shows
+  about 14 days) and its list starts over once all were handed out.
 
-  | Quest | Reward |
+  | Quest (screenshots) | Reward |
   |---|---|
-  | Win 10 trophies | 100 gold |
-  | Play 6 duels | 1 Musketeer fragment |
-  | Play 3 rumbles | 1 fragment |
-  | Win 3:0 in a duel (3×) | 1–3 random fragments (quest_daily_Mystery) |
-  | Prince charges 3 enemies in a match | 10 Crystal Coins, 10 gems |
-  | 6 matches with Royal Champion | 15 Crystal Coins (3 × 5) |
-  | Advance on the Adventure Road 5 times | 5 Crystal Coins, 25 hero fragments |
-  | Play 20 duels | 15 Crystal Coins (3 × 5) |
+  | Play 6 duels | random fragments (ours; "1 Musketeer fragment") |
+  | Play 3 rumbles | random fragments (ours; "1 fragment") |
+  | Win 3:0 in a duel (3×) | 1–3 random fragments |
+  | 6 matches using Royal Champion | 15 Crystal Coins (3 × 5) |
+  | Advance on the Adventure Road 5 times | 5 Crystal Coins, 25 Monk fragments |
+  | Play 20 duels | 15 Crystal Coins |
+  | Win 3 matches using Musketeer | 10 Crystal Coins |
+  | Play 10 rumbles | 15 Crystal Coins |
 
-  The group's header: "Finish 12 Clashmas Quests to unlock Candy Elf
-  Skin!" (TID_QUEST_GROUP_PROGRESS_TOOLTIPS); the screenshot shows
-  12 days 11 hours left (its date unknown, so the end too). There were more
-  than 12 quests: after 12 done the group went on (a screenshot at 12/12
-  still shows open quests). The quests themselves were server data, not
-  in the APK (only the group's texts are); see B2.
+  Left out: "Win 10 trophies" (100 gold; MetaResourceGained crashed the
+  quest screen, 0075) and "Prince charges 3 enemies in a match" (10
+  Crystal Coins, 10 gems; AbilityHitInOneGame, state not known).
 
 ### A4. Crystal Coins (0065, 0074; tested)
 
@@ -181,8 +182,8 @@ videos, r/ClashMini), the wiki's Mini Pass page as text.
 
 - **B1. The road per tier**: which reward on each of the 90 tiers, the
   fuel per tier, the free / pass lane split (ours in 0065).
-- **B2. All Clashmas quests** and their rewards (9 known, more than 12
-  in all). Where: videos of the quest screen from 21 December 2021 into
+- **B2. All Clashmas quests** and their rewards (10 known, 8 in the
+  game, more than 12 in all). Where: videos of the quest screen from 21 December 2021 into
   January 2022 (the group shows a few quests at a time, so
   each video adds some), screenshots on r/ClashMini and Discord.
 - **B3. Mini quest rewards**: which fragment and how many.

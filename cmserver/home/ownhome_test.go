@@ -417,11 +417,35 @@ func decodeQuests(r *proto.Reader) []Quest {
 		}
 		lastChains = append(lastChains, chainState{ev, step, q})
 	}
-	for i := 0; i < 2; i++ {
-		r.VInt()
+	// the group quests (+0xa0) and the groups' state
+	lastGroupQuests, lastGroups = nil, nil
+	for n := r.VInt(); n > 0 && r.Err() == nil; n-- {
+		lastGroupQuests = append(lastGroupQuests, decodeQuest(r))
+	}
+	for n := r.VInt(); n > 0 && r.Err() == nil; n-- {
+		g := groupState{event: r.VInt(), done: r.VInt()}
+		for m := r.VInt(); m > 0; m-- {
+			g.taken = append(g.taken, r.VInt())
+		}
+		for m := r.VInt(); m > 0; m-- {
+			g.claimed = append(g.claimed, r.VInt())
+		}
+		lastGroups = append(lastGroups, g)
 	}
 	return out
 }
+
+type groupState struct {
+	event, done    int32
+	taken, claimed []int32
+}
+
+// lastGroupQuests, lastGroups: the group quests and states decodeQuests
+// read last.
+var (
+	lastGroupQuests []Quest
+	lastGroups      []groupState
+)
 
 type chainState struct {
 	event, step int32

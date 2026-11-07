@@ -27,6 +27,7 @@ const (
 	cmdChestOpenFinish  = 550 // LogicChestOpenFinishCommand: base, vint chest index
 	cmdClaimQuest       = 503 // LogicClaimQuestRewardCommand: base, vint quest id, bool
 	cmdRerollQuest      = 502 // LogicRerollQuestCommand: base, vint quest id
+	cmdClaimMilestone   = 508 // LogicClaimQuestMilestoneCommand: base, vint event, vint milestone
 	cmdClaimSeason      = 601 // LogicClaimAllSeasonRewardsCommand: base, bool, vint tier
 	cmdSeasonSeen       = 505 // LogicUpdateSeasonTierSeenCommand: base, vint season
 	cmdBuyChest         = 702 // LogicBuyChestCommand: base, vint event, vint item
@@ -84,6 +85,8 @@ func (c command) String() string {
 		return fmt.Sprintf("LogicRerollQuestCommand quest %d", c.args[0])
 	case cmdClaimQuest:
 		return fmt.Sprintf("LogicClaimQuestRewardCommand quest %d", c.args[0])
+	case cmdClaimMilestone:
+		return fmt.Sprintf("LogicClaimQuestMilestoneCommand event %d milestone %d", c.args[0], c.args[1])
 	case cmdClaimSeason:
 		return fmt.Sprintf("LogicClaimAllSeasonRewardsCommand tier %d", c.args[0])
 	case cmdSeasonSeen:
@@ -166,6 +169,10 @@ func parseEndClientTurn(p []byte) (cmds []command, err error) {
 			base(r)
 			c.args = []int32{r.VInt()}
 			r.Bool()
+		case cmdClaimMilestone:
+			// decoder 0x466644: base, VInt event (+0x1c), VInt milestone (+0x20)
+			base(r)
+			c.args = []int32{r.VInt(), r.VInt()}
 		case cmdClaimSeason:
 			// encoder 0x4c59a0: base, Bool (+0x1c), VInt tier (+0x20)
 			base(r)
@@ -291,6 +298,13 @@ func apply(acc *home.Account, cmds []command) (matchMode int32, ranked bool) {
 				continue
 			}
 			log.Printf("   quest %d claimed: %s", c.args[0], rw.String())
+		case cmdClaimMilestone:
+			rw := &home.Reward{}
+			if err := acc.ClaimMilestone(rw, c.args[0], c.args[1]); err != nil {
+				log.Printf("   milestone %d of event %d claimed, but the server refused: %v", c.args[1], c.args[0], err)
+				continue
+			}
+			log.Printf("   milestone %d of event %d claimed: %s", c.args[1], c.args[0], rw.String())
 		case cmdClaimSeason:
 			rw := &home.Reward{}
 			n := acc.ClaimSeasonRewards(rw)
