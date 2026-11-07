@@ -53,7 +53,8 @@ func CmServerStart(dataDir, keyHex, options *C.char) C.int {
 			ret = -1
 			return
 		}
-		acc, err := home.LoadAccount(filepath.Join(dir, "accounts.json"))
+		home.Dev = opts["dev"] == "on"
+		acc, err := home.LoadAccount(filepath.Join(dir, home.AccountFile(home.Dev)))
 		if err != nil {
 			log.Printf("account: %v", err)
 			ret = -1
@@ -84,7 +85,7 @@ func CmServerStart(dataDir, keyHex, options *C.char) C.int {
 		if msg := acc.CatchUp(); msg != "" {
 			log.Printf("%s", msg)
 		}
-		log.Printf("account %q in %s, progression %v", acc.Name, dir, acc.Progression)
+		log.Printf("account %q in %s, progression %v, dev %v", acc.Name, dir, acc.Progression, home.Dev)
 		s := srv.New(key, acc, srv.Options{BattleOnline: true})
 		go func() { log.Printf("server stopped: %v", s.Serve(ln)) }()
 	})

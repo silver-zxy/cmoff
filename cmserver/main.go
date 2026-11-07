@@ -27,6 +27,7 @@ func main() {
 	winFragments := flag.Bool("win-fragments", false, "a won battle also brings fragments (not the original: there battles gave gold only)")
 	chests := flag.Bool("chests", true, "rewards come as chests to open in the home (-chests=false: straight into the account)")
 	tutorial := flag.Bool("tutorial", true, "new accounts play the game's tutorial (-tutorial=false: skip it)")
+	dev := flag.Bool("dev", false, "dev mode: every currency at its top, the road's fuel, every quest done (refilled with every home); saved in accounts-dev.json unless -accounts says otherwise")
 	progression := flag.String("progression", "", "fresh: earn the collection (starts once, then resumes); reset: start over; unlocked: everything unlocked; empty: as saved")
 	flag.Parse()
 
@@ -42,6 +43,10 @@ func main() {
 
 	home.DeckSlotValue = int32(*slotValue)
 	home.MiniLevel = int32(*miniLevel)
+	home.Dev = *dev
+	if *dev && *accPath == "accounts.json" {
+		*accPath = home.AccountFile(true)
+	}
 	acc, err := home.LoadAccount(*accPath)
 	if err != nil {
 		log.Fatal(err)

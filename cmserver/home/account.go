@@ -224,6 +224,7 @@ func (a *Account) OwnHomeData() []byte {
 
 // ownHome fills the message from the account. The caller holds the lock.
 func (a *Account) ownHome() ownHomeData {
+	a.devTopUp()
 	m := starterOwnHome()
 	h := &m.home
 	h.selected = a.Selected

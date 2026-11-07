@@ -43,6 +43,14 @@ APK that contains `lib/arm64-v8a/libg.so`).
     nix run .#standalone -- clashmini.apk        # or: NDK=... ./build.sh standalone clashmini.apk
     adb install out/clashmini-standalone.apk
 
+**Dev mode** for testing: an account of its own (your real one stays as it
+is) with every currency at its top, the Adventure Road's fuel for all
+tiers and every open quest done, refilled with every home. Build again
+without `DEV` to play your real account.
+
+    DEV=on TUTORIAL=off nix run .#standalone -- clashmini.apk
+    adb install -r out/clashmini-standalone.apk
+
 **Connect** (server on your PC, handy for development — every message is logged):
 
     nix run .#connect -- clashmini.apk
