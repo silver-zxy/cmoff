@@ -32,6 +32,10 @@ the phone before the next.
 - Tested on the phone: the starting chest as one chest, the road's info
   page, the shop's chests.
 - Research: docs/ORIGINAL.md (sources, wiki, screenshots).
+- Tested on the phone (7 November 2026): the Clashmas quests under their
+  header with the Candy Elf, skins locked and unlocked through the road,
+  the quests and the shop (0087-0092), hero quests and new minis first
+  (0090), dev mode (0093).
 - Tested on the phone (November 2026): boards by league (A0), bots with
   their decks' own levels (A1), the shop with the original prices (A2),
   daily quests six at once, the battle kinds counted by the client
@@ -64,8 +68,8 @@ the phone before the next.
 |---|---|---|
 | Minis | 3 a day, 1 each, +1 fragment, 250 / 500 / 750 gold (by elixir) | ✅ 0065 |
 | Heroes | 3 a day, 5 each, +25 fragments for 100 gems | ✅ 0065 |
-| Clashmas Special | Jolly 159 gems, Helpful 99 gems, "Clashmas Skins" (Gift, Sparkle, Snowler) | 0091 (to test) |
-| Crystal Coin skins | Crystal P.E.K.K.A 100, Fabulous Prince 600 | 0091 (to test) |
+| Clashmas Special | Jolly 159 gems, Helpful 99 gems, "Clashmas Skins" (Gift, Sparkle, Snowler) | 0091, 0092 (tested) |
+| Crystal Coin skins | Crystal P.E.K.K.A 100, Fabulous Prince 600 | 0091, 0092 (tested) |
 
 - The Clashmas Skins bundle cost real money (7.99 €): free (claim for 0).
 - Left out: gem packs, Starter Bundle (real money), our old 240 gold for
@@ -95,7 +99,7 @@ Also done:
   and a chain's quest belongs in the chains' state, one chain event per
   mini (0081).
 
-Also (0090, to test):
+Also (0090, tested):
 - Hero quests in the daily pool ("a larger pool of hero quests", patch
   notes): win 6 rounds / play 3 matches using the day's hero (one of the
   five starting heroes, by day), quest_daily_mystery_Hero (30-50 gold, a
@@ -113,7 +117,7 @@ Also (0090, to test):
   quest_Competitive_5W: 1 Crystal Coin), "Use N Crystal Coins".
 
 Still to do:
-- Clashmas quests (0087; category 6, under their header, 0089; to test): Clashmas was a time, not a single
+- Clashmas quests (0087; category 6, under their header, 0089; tested): Clashmas was a time, not a single
   event: in it the Clashmas quest group was on (QUEST_GROUP, event 3001),
   three of its quests at a time; 12 done unlock the Candy Elf (milestone,
   508), after that the group goes on with Crystal Coins. Our snapshot
@@ -144,14 +148,14 @@ Still to do:
   past max level before 0074 turn into coins once at the start.
 - Spending them: the Crystal Coins Skin module (0091).
 
-### A5. Skins locked, unlocked as in the original (0088, to test)
+### A5. Skins locked, unlocked as in the original (0088; tested)
 
 - Every account, the existing ones too, starts with only the default
   skins (locked once at the start; a locked skin worn goes back to the
   default). A skin is owned once a chest gives it, and never lost.
 - Unlocked by (0088): the road (Plush P.E.K.K.A tier 26, Luchador Monk
   tier 87), the Clashmas quests (Candy Elf, 12 quests).
-- The shop's skins (0091; small buttons 0092, to test): Clashmas Special Jolly
+- The shop's skins (0091; small buttons 0092; tested): Clashmas Special Jolly
   159 gems, Helpful 99 gems; Clashmas Skins (BundleModule) Gift, Sparkle,
   Snowler free; Crystal Coins Skin: Crystal P.E.K.K.A 100,
   Fabulous Prince 600 Crystal Coins. A skin owned shows as bought in
