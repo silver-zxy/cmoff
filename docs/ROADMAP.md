@@ -151,9 +151,9 @@ Still to do:
   default). A skin is owned once a chest gives it, and never lost.
 - Unlocked by (0088): the road (Plush P.E.K.K.A tier 26, Luchador Monk
   tier 87), the Clashmas quests (Candy Elf, 12 quests).
-- The shop's skins (0091, to test): Clashmas Special (XmasModule) Jolly
+- The shop's skins (0091; small buttons 0092, to test): Clashmas Special Jolly
   159 gems, Helpful 99 gems; Clashmas Skins (BundleModule) Gift, Sparkle,
-  Snowler free; Crystal Coins Skin (SkinModule) Crystal P.E.K.K.A 100,
+  Snowler free; Crystal Coins Skin: Crystal P.E.K.K.A 100,
   Fabulous Prince 600 Crystal Coins. A skin owned shows as bought in
   every day's shop; the server refuses to sell it again.
 - The older skins (Celtic Magic Archer, Scientist Electro Wizard,

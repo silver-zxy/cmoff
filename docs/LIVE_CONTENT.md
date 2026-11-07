@@ -369,3 +369,13 @@ Fifth test: still the old quest again, without rewards. Two causes:
 - The live quest data of PlayWithUnit / WinWithUnit takes its unit as
   PieceRequirementType MiniFromList + UnitList (table 6 names: characters
   then characters_heroes, so a hero such as HeroRoyalChampion too).
+
+## Shop pictures (0092)
+
+- A shop item's ButtonWidgetImage is an object {File, Path, Checksum}
+  (0x6bb594 -> 0x79d108): a picture the live server had the client
+  download. XmasModule (shop_item_skin_xmas) and SkinModule
+  (shop_large_item_skin) draw their items with it, so offline they stay
+  empty (0091). The skins go in BasicModule's small buttons, which draw
+  the chest's content from the game's cards (ui_cards.sc: skin_*);
+  BundleModule draws its chests' content too.

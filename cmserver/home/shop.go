@@ -29,11 +29,11 @@ import (
 //     500 / 750 gold by the mini's elixir cost (2 / 3 / 4);
 //   - Heroes: three offers a day, 25 fragments each, five times each, for
 //     100 gems.
-//   - Clashmas Special (XmasModule): Jolly Barbarian King 159 gems,
+//   - Clashmas Special: Jolly Barbarian King 159 gems,
 //     Helpful Mini P.E.K.K.A 99 gems;
 //   - Clashmas Skins (BundleModule): Gift Giant Skeleton, Sparkle Archer,
 //     Snowler Bowler; it cost real money, ours is free;
-//   - Crystal Coins Skin (SkinModule): Crystal P.E.K.K.A 100, Fabulous
+//   - Crystal Coins Skin: Crystal P.E.K.K.A 100, Fabulous
 //     Prince 600 Crystal Coins (PromotionToken).
 // A new shop every day (UTC), its own event id per day so the limits start
 // anew; a skin owned counts as bought in every day's shop (the home's
@@ -145,7 +145,12 @@ func shopModules(day int32) []shopModule {
 	return []shopModule{
 		{"BasicModule", "TID_CHRONOS_SHOP_TITLE_MINIS", miniItems},
 		{"BasicModule", "TID_CHRONOS_SHOP_TITLE_HEROES", heroItems},
-		{"XmasModule", "TID_CHRONOS_SHOP_MODULE_CLASHMAS_SKIN", []shopItem{
+		// XmasModule and SkinModule draw their items with a picture the
+		// live server had the client download (the item's
+		// ButtonWidgetImage: File, Path, Checksum; 0x6bb594, 0x79d108):
+		// offline they stayed empty (0091). The common module's small
+		// buttons show the chest's skin from the game's own cards.
+		{"BasicModule", "TID_CHRONOS_SHOP_MODULE_CLASHMAS_SKIN", []shopItem{
 			{Chest: chestSkinJolly, Resource: "Diamonds", Cost: 159, Limit: 1},
 			{Chest: chestSkinHelpful, Resource: "Diamonds", Cost: 99, Limit: 1},
 		}},
@@ -153,9 +158,9 @@ func shopModules(day int32) []shopModule {
 			{Chest: chestSkinGift, More: []int32{chestSkinSparkle, chestSkinSnowler},
 				Resource: "Diamonds", Cost: 0, Limit: 1, Large: true},
 		}},
-		{"SkinModule", "TID_CHRONOS_SHOP_MODULE_CRYSTAL_COIN", []shopItem{
-			{Chest: chestSkinCrystalPekka, Resource: "PromotionToken", Cost: 100, Limit: 1, Large: true},
-			{Chest: chestSkinFabulous, Resource: "PromotionToken", Cost: 600, Limit: 1, Large: true},
+		{"BasicModule", "TID_CHRONOS_SHOP_MODULE_CRYSTAL_COIN", []shopItem{
+			{Chest: chestSkinCrystalPekka, Resource: "PromotionToken", Cost: 100, Limit: 1},
+			{Chest: chestSkinFabulous, Resource: "PromotionToken", Cost: 600, Limit: 1},
 		}},
 	}
 }
