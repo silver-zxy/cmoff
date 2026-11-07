@@ -106,7 +106,16 @@ Still to do:
   | Play 3 rumbles | 1 fragment |
   | Win 3:0 in a duel (3×) | 1–3 random fragments (quest_daily_Mystery) |
   | Prince charges 3 enemies in a match | 10 Crystal Coins, 10 gems |
-  | 6 matches with Royal Champion | 15 Crystal Coins |
+  | 6 matches with Royal Champion | 15 Crystal Coins (3 × 5) |
+  | Advance on the Adventure Road 5 times | 5 Crystal Coins, 25 hero fragments |
+  | Play 20 duels | 15 Crystal Coins (3 × 5) |
+
+  The group's header: "Finish 12 Clashmas Quests to unlock Candy Elf
+  Skin!" (TID_QUEST_GROUP_PROGRESS_TOOLTIPS); the screenshot shows
+  12 days 11 hours left (its date unknown, so the end too). There were more
+  than 12 quests: after 12 done the group went on (a screenshot at 12/12
+  still shows open quests). The quests themselves were server data, not
+  in the APK (only the group's texts are); see B2.
 
 ### A4. Crystal Coins (0065, 0074; tested)
 
@@ -172,7 +181,10 @@ videos, r/ClashMini), the wiki's Mini Pass page as text.
 
 - **B1. The road per tier**: which reward on each of the 90 tiers, the
   fuel per tier, the free / pass lane split (ours in 0065).
-- **B2. The other 6 Clashmas quests** and their rewards.
+- **B2. All Clashmas quests** and their rewards (9 known, more than 12
+  in all). Where: videos of the quest screen from 21 December 2021 into
+  January 2022 (the group shows a few quests at a time, so
+  each video adds some), screenshots on r/ClashMini and Discord.
 - **B3. Mini quest rewards**: which fragment and how many.
 - **B4. Star exchange in detail**: the screen and how the
   EndStars_Min_2/3/4_Cost refunds count (if the client does not show it).
