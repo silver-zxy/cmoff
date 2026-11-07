@@ -132,6 +132,22 @@ func defaultSkin(owner int32) int32 {
 // a chest gives it (the road's Plush P.E.K.K.A and Luchador Monk, the
 // Clashmas quests' Candy Elf, the shop's skins). A skin owned is never lost.
 
+// betaSkins: the older skins (skin_confs rows: Celtic Magic Archer 59,
+// Scientist Electro Wizard 65, Gravedigger Miner 70, Victory Shield
+// Maiden 80). They have shop chests (shop_skin_*), so they were sold
+// before December 2021, but how and for what is not known: everyone owns
+// them (decided, 0095).
+var betaSkins = []int32{59, 65, 70, 80}
+
+func isBetaSkin(skin int32) bool {
+	for _, r := range betaSkins {
+		if skin == globalID(classSkin, r) {
+			return true
+		}
+	}
+	return false
+}
+
 // ownSkin: a chest gave a skin (global id, class 44).
 func (a *Account) ownSkin(skin int32) {
 	for _, s := range a.OwnedSkins {
@@ -144,7 +160,7 @@ func (a *Account) ownSkin(skin int32) {
 
 // ownsSkin: the player has the extra skin (all of them without progression).
 func (a *Account) ownsSkin(skin int32) bool {
-	if !a.Progression {
+	if !a.Progression || isBetaSkin(skin) {
 		return true
 	}
 	for _, s := range a.OwnedSkins {
@@ -163,6 +179,9 @@ func (a *Account) ownedSkinSet() map[int32]bool {
 	m := map[int32]bool{}
 	for _, s := range a.OwnedSkins {
 		m[s] = true
+	}
+	for _, r := range betaSkins {
+		m[globalID(classSkin, r)] = true
 	}
 	return m
 }

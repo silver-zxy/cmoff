@@ -109,7 +109,7 @@ func TestSkinsLocked(t *testing.T) {
 	}
 	a.addFragments(&Reward{}, crystal, 1)
 	a.SelectSkin(crystal)
-	if a.Skins[36000017] != crystal || !a.ownedSkinSet()[crystal] || len(a.ownedSkinSet()) != 1 {
+	if a.Skins[36000017] != crystal || !a.ownedSkinSet()[crystal] || len(a.ownedSkinSet()) != 1+len(betaSkins) {
 		t.Fatalf("owned %+v worn %+v", a.OwnedSkins, a.Skins)
 	}
 }
