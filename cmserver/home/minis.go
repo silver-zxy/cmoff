@@ -113,34 +113,18 @@ func (a *Account) refreshMiniQuests() {
 		}
 	}
 	a.MiniQuests = keep
-	// Mini quests came with a newly unlocked mini (Deconstructor of Fun,
-	// January 2022: "triggered when a new unit is unlocked"): the minis
-	// unlocked since the last home first, the latest first; then, as ours,
-	// the deck's minis and the others, so every mini keeps its quests.
+	// Mini quests come with a newly unlocked mini, as in the original
+	// (Deconstructor of Fun, January 2022: "triggered when a new unit is
+	// unlocked"; decided 0097): only the minis unlocked since the account
+	// was first seen (MiniNew), the earliest first. Quests open from
+	// before stay until claimed.
 	a.noteNewMinis()
 	var order []int
-	seen := map[int]bool{}
-	for k := len(a.MiniNew) - 1; k >= 0; k-- {
-		for i, r := range miniSeasonalRows {
-			if r == a.MiniNew[k] && !seen[i] {
+	for _, r := range a.MiniNew {
+		for i, sr := range miniSeasonalRows {
+			if sr == r {
 				order = append(order, i)
-				seen[i] = true
 			}
-		}
-	}
-	inDeck := map[int32]bool{}
-	for _, r := range a.Decks[a.Selected] {
-		inDeck[r] = true
-	}
-	for i, r := range miniSeasonalRows {
-		if inDeck[r] && !seen[i] {
-			order = append(order, i)
-			seen[i] = true
-		}
-	}
-	for i := range miniSeasonalRows {
-		if !seen[i] {
-			order = append(order, i)
 		}
 	}
 	for _, i := range order {

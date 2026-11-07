@@ -115,8 +115,8 @@ Also (0090, tested):
   five starting heroes, by day), quest_daily_mystery_Hero (30-50 gold, a
   Pony Fuel, 3 hero fragments). The client counts them in battle.
 - Mini quests come first for a newly unlocked mini (Deconstructor of
-  Fun: "triggered when a new unit is unlocked"); then, as ours, the
-  deck's minis and the others.
+  Fun: "triggered when a new unit is unlocked"); from 0097 only for
+  newly unlocked minis (decided), quests open from before stay.
 - Seasonal quests: the client has the section (SEASONAL QUEST, category
   1, a chain with Category "Season") but no quest of its own for it; no
   source shows seasonal quests in December 2021, so none.

@@ -23,6 +23,9 @@ func TestMiniQuests(t *testing.T) {
 	a := NewAccount()
 	a.StartProgression()
 	a.Decks[a.Selected] = [5]int32{4, 0, 1, 5, 6}
+	// the starter minis count as unlocked after the first home (only new
+	// minis get mini quests)
+	a.MiniSeen = []int32{-1}
 	a.refreshMiniQuests()
 	if len(a.MiniQuests) != miniQuestsShown {
 		t.Fatalf("mini quests %+v", a.MiniQuests)
@@ -32,7 +35,7 @@ func TestMiniQuests(t *testing.T) {
 	if first.Target != 1 || first.Own["RequirementMini"] == "" || first.req() == 0 {
 		t.Fatalf("first %+v", first)
 	}
-	// the deck's minis, in miniSeasonalRows order: Knight (0), Barbarian (1), Archer (3)
+	// in the order they were unlocked: Knight (0), Barbarian (1), Archer (3)
 	if a.MiniQuests[0].Index != 0 || a.MiniQuests[1].Index != 1*3 || a.MiniQuests[2].Index != 3*3 {
 		t.Fatalf("order %+v", a.MiniQuests)
 	}
@@ -160,5 +163,17 @@ func TestHeroQuests(t *testing.T) {
 	}
 	if n := todaysQuests()[0].Own["RequirementMini"]; n == heroOfDay || n == "" {
 		t.Fatalf("hero %v", n)
+	}
+}
+
+// Minis owned at the first home get no mini quests; one unlocked later does.
+func TestMiniQuestsOnlyNew(t *testing.T) {
+	Data = miniData()
+	defer func() { Data = nil }()
+	a := NewAccount()
+	a.StartProgression()
+	a.refreshMiniQuests()
+	if len(a.MiniQuests) != 0 {
+		t.Fatalf("starter minis got quests %+v", a.MiniQuests)
 	}
 }
