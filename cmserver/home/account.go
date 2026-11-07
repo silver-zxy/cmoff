@@ -311,7 +311,7 @@ func (a *Account) ownHome() ownHomeData {
 		// (0x5e0478 finds no pool) rebuilds the old quest (0x8c8c8c).
 		m.tail[1] = int32(now().Unix())
 		h.season = a.season()
-		h.purchases = a.todaysPurchases()
+		h.purchases = a.shopPurchases()
 		h.seasonSeen = h.season.Seen - 1
 	}
 	return m

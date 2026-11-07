@@ -64,8 +64,8 @@ the phone before the next.
 |---|---|---|
 | Minis | 3 a day, 1 each, +1 fragment, 250 / 500 / 750 gold (by elixir) | ✅ 0065 |
 | Heroes | 3 a day, 5 each, +25 fragments for 100 gems | ✅ 0065 |
-| Clashmas Special | Jolly 159 gems, Helpful 99 gems, "Clashmas Skins" (Gift, Sparkle, Snowler) | with A5 |
-| Crystal Coin skins | Crystal P.E.K.K.A 100, Fabulous Prince 600 | with A4/A5 |
+| Clashmas Special | Jolly 159 gems, Helpful 99 gems, "Clashmas Skins" (Gift, Sparkle, Snowler) | 0091 (to test) |
+| Crystal Coin skins | Crystal P.E.K.K.A 100, Fabulous Prince 600 | 0091 (to test) |
 
 - The Clashmas Skins bundle cost real money (7.99 €): free (claim for 0).
 - Left out: gem packs, Starter Bundle (real money), our old 240 gold for
@@ -142,7 +142,7 @@ Still to do:
 - Fragments beyond a unit's max level become 1 Crystal Coin each, as the
   client does (0x7d7550; collectibles.json fragmentToRes); fragments saved
   past max level before 0074 turn into coins once at the start.
-- Spending them: with A5.
+- Spending them: the Crystal Coins Skin module (0091).
 
 ### A5. Skins locked, unlocked as in the original (0088, to test)
 
@@ -151,11 +151,11 @@ Still to do:
   default). A skin is owned once a chest gives it, and never lost.
 - Unlocked by (0088): the road (Plush P.E.K.K.A tier 26, Luchador Monk
   tier 87), the Clashmas quests (Candy Elf, 12 quests).
-- Still to do: the shop's skins (Jolly 159 gems, Helpful 99 gems, the
-  Clashmas Skins bundle free, Crystal P.E.K.K.A 100 and Fabulous Prince
-  600 Crystal Coins; their chests are in chests.json:
-  shop_skin_pekkaCrystal, _PrinceFabulous, _BarbarianKingJolly,
-  _MiniPekkaWindup, _GiantSkeletonGift, _BowlerSnowler, _ArcherSparkle).
+- The shop's skins (0091; small buttons 0092, to test): Clashmas Special Jolly
+  159 gems, Helpful 99 gems; Clashmas Skins (BundleModule) Gift, Sparkle,
+  Snowler free; Crystal Coins Skin: Crystal P.E.K.K.A 100,
+  Fabulous Prince 600 Crystal Coins. A skin owned shows as bought in
+  every day's shop; the server refuses to sell it again.
 - The older skins (Celtic Magic Archer, Scientist Electro Wizard,
   Gravedigger Miner, Victory Shield Maiden) were not on sale in December
   2021: they stay locked unless we learn more (B8).

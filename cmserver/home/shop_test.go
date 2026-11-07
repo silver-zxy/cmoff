@@ -26,6 +26,10 @@ func shopData() *GameData {
 	for _, id := range shopHeroChests {
 		frag(id, heroID(12), 25)
 	}
+	for id, row := range map[int32]int32{chestSkinCrystalPekka: 35, chestSkinFabulous: 89, chestSkinJolly: 90,
+		chestSkinHelpful: 91, chestSkinGift: 92, chestSkinSnowler: 94, chestSkinSparkle: 95} {
+		frag(id, globalID(classSkin, row), 1)
+	}
 	return d
 }
 
@@ -53,7 +57,7 @@ func TestShop(t *testing.T) {
 			}
 		}
 	}
-	if err := json.Unmarshal([]byte(ev.Parameters), &p); err != nil || len(p.Modules) != 2 ||
+	if err := json.Unmarshal([]byte(ev.Parameters), &p); err != nil || len(p.Modules) != 5 ||
 		len(p.Modules[0].Items) != shopMinisPerDay || len(p.Modules[1].Items) != shopHeroesPerDay ||
 		p.Modules[0].CountdownMode != "EndTimer" {
 		t.Fatalf("%v %s", err, ev.Parameters)
@@ -112,6 +116,46 @@ func TestShop(t *testing.T) {
 	if err != nil || len(m.home.purchases) != 6 || m.home.purchases[0] != (Purchase{ev.ID, 0}) || m.home.season == nil {
 		t.Fatalf("%v purchases %+v", err, m.home.purchases)
 	}
+	// the skins: 6 Jolly (159 gems), 7 Helpful, 8 the Clashmas bundle
+	// (free, three skins), 9 Crystal P.E.K.K.A (100 Crystal Coins), 10
+	// Fabulous Prince (600)
+	a.Gems, a.CrystalCoins = 200, 150
+	// a skin is owned once its chest is opened
+	buy := func(item int32) (int32, string) {
+		c, why := a.BuyShopItem(&Reward{}, ev.ID, item)
+		if c != 0 {
+			a.OpenPending(a.Chests[len(a.Chests)-1].Index)
+		}
+		return c, why
+	}
+	if c, why := buy(8); c == 0 || a.Gems != 200 || len(a.OwnedSkins) != 3 {
+		t.Fatalf("bundle: %s gems %d skins %v", why, a.Gems, a.OwnedSkins)
+	}
+	if c, why := buy(6); c == 0 || a.Gems != 41 {
+		t.Fatalf("jolly: %s gems %d", why, a.Gems)
+	}
+	if c, why := buy(9); c == 0 || a.CrystalCoins != 50 || !a.ownsSkin(globalID(classSkin, 35)) {
+		t.Fatalf("crystal pekka: %s coins %d", why, a.CrystalCoins)
+	}
+	if c, why := a.BuyShopItem(&Reward{}, ev.ID, 10); c != 0 || why != "not enough crystal coins" {
+		t.Fatalf("fabulous: %s", why)
+	}
+	// the next day the owned skins are still "bought"
+	day = day.AddDate(0, 0, 1)
+	ev2 := shopLiveEvent()
+	got := map[int32]bool{}
+	for _, p := range a.shopPurchases() {
+		if p.Event == ev2.ID {
+			got[p.Item] = true
+		}
+	}
+	if !got[6] || !got[8] || !got[9] || got[7] || got[10] {
+		t.Fatalf("owned skins in the next shop %v", got)
+	}
+	if c, why := a.BuyShopItem(&Reward{}, ev2.ID, 9); c != 0 || why != "skin already owned" {
+		t.Fatalf("bought an owned skin: %s", why)
+	}
+	day = day.AddDate(0, 0, -1)
 	// the next day
 	day = day.AddDate(0, 0, 1)
 	if len(a.todaysPurchases()) != 0 || shopLiveEvent().ID != ev.ID+1 {
