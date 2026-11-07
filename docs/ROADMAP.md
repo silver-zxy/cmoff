@@ -68,7 +68,8 @@ the phone before the next.
    (quest_Competitive_5W), "Use N Crystal Coins".
 5. Part B research (B1 road per tier, B2 Clashmas quests, B3 mini quest
    rewards, B5 daily quests, B7 the skins bundle).
-6. A10 Mini Room / PvP (largest).
+6. A10 Mini Room with real players: way A (local network) and way B
+   (relay), see A10.
 
 ## Part A: what we know
 
@@ -346,11 +347,51 @@ Still to do:
 
 Not built: the tab stays as the client shows it without messages.
 
-### A10. Mini Room / PvP
+### A10. Mini Room with real players (next)
 
-Rooms (10181/10186/14761/10190, 20188), a battle for two real players
-(SectorState, relayed SectorCommand 16634, UDP 23036); Mini Room battles
-count for neither quests nor ranked (as in the original).
+Decided (7 November 2026): way A (local network) and way B (a relay), so
+that we can play in the same Wi-Fi and with people anywhere. Mini Room
+battles count for neither quests nor ranked (as in the original).
+
+How it fits together: the client only ever talks to its own server (the
+one in the APK, 127.0.0.1); it cannot reach another phone. Every phone
+keeps its own server and account; a meeting point passes the room and
+the battle between the two servers. Battles are lockstep (both clients
+simulate, checksums 0x994008): the meeting point hands out the start
+(SectorState) and passes the players' commands (SectorCommand 16634); it
+does not simulate. The client takes a separate battle address and keys
+from UdpConnectionInfoMessage 23036 (decoder 0x7f93f0: a VInt, a string,
+an int, bytes), so the battle may go to another host than the home.
+
+1. Understand the client:
+   - the room messages: Create / Join / Leave / StartGameRoomMatch
+     (10181, 10186, 14761, 10190), their responses (24566, 24568, 24571,
+     24573), GameRoomMembers 20188, GameRoomShutdown 24572;
+   - SectorState 22681 for two real players (an earlier server-built
+     battle kept the tutorial's rules, reference/SERVER.md), SectorStateOk
+     17239, RequestSectorState 17918;
+   - UdpConnectionInfo 23036 and the UDP channel (PepperPerMessageEncrypter,
+     reference/SERVER.md), or whether battles also run over TCP;
+   - whether the client needs the server's checksums or plain passing on
+     is enough.
+2. Way A, local network: one phone is the host; its server also listens
+   in the Wi-Fi and is the meeting point. The other phone's server
+   connects to it and passes its client's room and battle messages on.
+3. Way B, relay: the same meeting point as a small program of its own
+   (Go, cmserver/relay) for a VPS or PC reachable from the internet. Both
+   phones connect out to it (phones behind NAT cannot be reached from
+   outside). It keeps no accounts and no game data, only rooms in memory,
+   and passes messages. An access code for the group. One small VPS (4-5 EUR
+   a month) is plenty for a group of friends; an alternative without a
+   relay: a VPN such as Tailscale, then way A over it.
+4. In the app: be the host / join a host (address) / relay address and
+   code; a guide for setting up a VPS.
+5. Later, only if needed: several relays and a lobby (room code -> relay).
+   A relay does not simulate and only passes small messages, so one small
+   server carries thousands of players; beyond that, more relays, each
+   room on one of them.
+
+Much later: real PvP (matchmaking, ranked) on top of the same relay.
 
 ## Part B: TODO, not known yet (ours until found)
 
