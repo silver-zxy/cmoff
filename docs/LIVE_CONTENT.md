@@ -402,7 +402,6 @@ Fifth test: still the old quest again, without rewards. Two causes:
   with the offline flag set for that call (the flag inside 0x682b80 would
   also change 0x6b7fe0). That links the season manager to the new events
   and hands out the new chains' quests. The server sends 417 again when a
-  mini is unlocked. Patched at the hook's start, the client crashed while
-  starting (0x60a330 -> 0x3e4eb0, an obfuscated jump into nowhere: likely
-  a check of its vtables); from 0114 the slot is patched once the home is
-  reached (game state 4).
+  mini is unlocked. The slot is patched once the home is reached (game
+  state 4, 0114). The start-up crash that 0114 was made for came from the
+  help page instead (0115).

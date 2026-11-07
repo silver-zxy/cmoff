@@ -206,9 +206,18 @@ def patch_server_key(libg, key_hex):
 # locale's help URL (locales.csv) plus "?time=<seconds>". A data: URL needs
 # neither the network nor cleartext HTTP (blocked for targetSdk 30); the page
 # ends in an open comment so the appended "?time=..." stays invisible.
+# The client crashed at its start (0x60a330 -> 0x3e4eb0) with a URL of
+# 8256 characters; 7988 was fine: a locales.csv cell must stay under 8192.
+HELP_URL_MAX = 8000
+
+
 def help_data_url(html):
     page = html.strip() + "<!--"
-    return "data:text/html;charset=utf-8," + urllib.parse.quote(page, safe="")
+    url = "data:text/html;charset=utf-8," + urllib.parse.quote(page, safe="")
+    if len(url) > HELP_URL_MAX:
+        die(f"help page too long: {len(url)} characters as a URL, at most {HELP_URL_MAX} "
+            "(the client crashes at its start); shorten cmoffline/help/help.html")
+    return url
 
 
 def sc_lzma_decode(b):

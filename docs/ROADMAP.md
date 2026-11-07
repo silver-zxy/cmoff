@@ -337,7 +337,9 @@ videos, r/ClashMini), the wiki's Mini Pass page as text.
 
 - ~~Help & Support~~ (0067, tested): opens our own help page
   (cmoffline/help/help.html, built into the APK's locales.csv); keep its
-  "Neu" list up to date with each patch.
+  "New" list up to date with each patch, but short: as a URL the page must
+  stay under 8192 characters, at 8256 the client crashed at its start
+  (0115; patch_apk.py stops the build above 8000).
 
 Then: decide together whether and how to publish.
 
