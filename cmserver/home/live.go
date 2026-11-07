@@ -157,7 +157,23 @@ const (
 // The quests a day can come from: only kinds the server can count from
 // what it sees (battle results, trophies, the road). The kinds, texts and
 // reward chests are the game's; the amounts are ours (docs/ROADMAP.md B5).
+// heroOfDay stands for the day's hero in a daily quest's RequirementMini:
+// the hero quests of the Clashmas update ("a larger pool of hero
+// quests"): win rounds / play matches using a hero, the game's
+// quest_daily_mystery_Hero (30-50 gold, a Pony Fuel, 3 hero fragments).
+const heroOfDay = "$hero"
+
+// dayHeroes: the heroes a day's hero quests take turns with (characters_
+// heroes.csv names; the five a player can have from the start).
+var dayHeroes = []string{"HeroBarbarian", "HeroArcher", "HeroMonk", "HeroShieldMaiden", "HeroVampireGirl"}
+
+const chestQuestHero int32 = 127_000_183 // quest_daily_mystery_Hero
+
 var questCatalog = []questDef{
+	{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINROUNDSWITHUNITSPECIFIC", 6,
+		[]int32{chestQuestHero}, map[string]any{"UseRoundWins": true, "RequirementMini": heroOfDay}},
+	{"PlayWithUnit", questPlayWithUnit, "TID_CHRONOS_QUESTS_PLAYWITHUNITSPECIFIC", 3,
+		[]int32{chestQuestHero}, map[string]any{"RequirementMini": heroOfDay}},
 	playDuels(3, rewardSmall),
 	playRumbles(2, rewardSmall),
 	{"PlayWithUnit", questPlayWithUnit, "TID_CHRONOS_QUESTS_PLAYWITHUNIT", 4,
@@ -214,14 +230,28 @@ const questPoolSize = questsPerDay + questRerollsPerDay
 // todaysQuests: today's pool (UTC day), seven of the catalog, the same all
 // day. The saved quests point into it by index.
 func todaysQuests() []questDef {
-	if len(questCatalog) <= questPoolSize {
-		return questCatalog
-	}
 	day := now().UTC().Unix() / 86400
-	rng := rand.New(rand.NewSource(day*104729 + 17))
+	pick := make([]int, len(questCatalog))
+	for i := range pick {
+		pick[i] = i
+	}
+	if len(questCatalog) > questPoolSize {
+		rng := rand.New(rand.NewSource(day*104729 + 17))
+		pick = rng.Perm(len(questCatalog))[:questPoolSize]
+	}
 	var out []questDef
-	for _, i := range rng.Perm(len(questCatalog))[:questPoolSize] {
-		out = append(out, questCatalog[i])
+	hero := dayHeroes[int(day)%len(dayHeroes)]
+	for _, i := range pick {
+		d := questCatalog[i]
+		if d.Own["RequirementMini"] == heroOfDay {
+			own := map[string]any{}
+			for k, v := range d.Own {
+				own[k] = v
+			}
+			own["RequirementMini"] = hero
+			d.Own = own
+		}
+		out = append(out, d)
 	}
 	return out
 }

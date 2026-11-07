@@ -113,18 +113,33 @@ func (a *Account) refreshMiniQuests() {
 		}
 	}
 	a.MiniQuests = keep
+	// Mini quests came with a newly unlocked mini (Deconstructor of Fun,
+	// January 2022: "triggered when a new unit is unlocked"): the minis
+	// unlocked since the last home first, the latest first; then, as ours,
+	// the deck's minis and the others, so every mini keeps its quests.
+	a.noteNewMinis()
 	var order []int
+	seen := map[int]bool{}
+	for k := len(a.MiniNew) - 1; k >= 0; k-- {
+		for i, r := range miniSeasonalRows {
+			if r == a.MiniNew[k] && !seen[i] {
+				order = append(order, i)
+				seen[i] = true
+			}
+		}
+	}
 	inDeck := map[int32]bool{}
 	for _, r := range a.Decks[a.Selected] {
 		inDeck[r] = true
 	}
 	for i, r := range miniSeasonalRows {
-		if inDeck[r] {
+		if inDeck[r] && !seen[i] {
 			order = append(order, i)
+			seen[i] = true
 		}
 	}
-	for i, r := range miniSeasonalRows {
-		if !inDeck[r] {
+	for i := range miniSeasonalRows {
+		if !seen[i] {
 			order = append(order, i)
 		}
 	}
@@ -196,4 +211,34 @@ func (a *Account) claimMiniQuest(r *Reward, id int32) bool {
 		return true
 	}
 	return false
+}
+
+// noteNewMinis: owned minis the account has not seen yet are newly
+// unlocked (any way: a chest, the shop, the client's own upgrade); the
+// first time, every owned mini is just seen. MiniNew keeps the unlock
+// order; a mini whose quests are all claimed leaves it.
+func (a *Account) noteNewMinis() {
+	first := len(a.MiniSeen) == 0
+	seen := map[int32]bool{}
+	for _, r := range a.MiniSeen {
+		seen[r] = true
+	}
+	for _, r := range miniSeasonalRows {
+		if seen[r] || a.owned(miniID(r)).Level == 0 {
+			continue
+		}
+		a.MiniSeen = append(a.MiniSeen, r)
+		if !first {
+			a.MiniNew = append(a.MiniNew, r)
+		}
+	}
+	keep := a.MiniNew[:0]
+	for _, r := range a.MiniNew {
+		for i, sr := range miniSeasonalRows {
+			if sr == r && int(a.MiniSteps[miniCharRows[i]]) < len(miniQuestWins) {
+				keep = append(keep, r)
+			}
+		}
+	}
+	a.MiniNew = keep
 }

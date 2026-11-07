@@ -306,7 +306,13 @@ func TestDailyQuests(t *testing.T) {
 	win := questDef{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINWITHUNIT", 2, rewardSmall, map[string]any{"UseRoundWins": false}}
 	road := questDef{"MetaSeasonRoadLevel", questSeasonRoadLevel, "TID_CHRONOS_QUESTS_SEASONPASSLEVELUP", 2, rewardSmall, nil}
 	play := questDef{"PlayWithUnit", questPlayWithUnit, "TID_CHRONOS_QUESTS_PLAYWITHUNIT", 4, rewardSmall, map[string]any{}}
-	questCatalog = []questDef{playDuels(3, rewardSmall), catalog[8], win, road, playRumbles(2, rewardSmall), play, playDuels(5, rewardBig)}
+	var winRumble questDef
+	for _, d := range catalog {
+		if d.TypeID == questWinRumble {
+			winRumble = d
+		}
+	}
+	questCatalog = []questDef{playDuels(3, rewardSmall), winRumble, win, road, playRumbles(2, rewardSmall), play, playDuels(5, rewardBig)}
 	day := time.Date(2026, 11, 4, 12, 0, 0, 0, time.Local)
 	now = func() time.Time { return day }
 	defer func() { now = time.Now }()

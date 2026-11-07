@@ -94,3 +94,71 @@ func TestMiniQuests(t *testing.T) {
 		t.Fatalf("%d chain events", len(events))
 	}
 }
+
+// A mini unlocked after the first home gets its quests first.
+func TestMiniQuestsNewFirst(t *testing.T) {
+	Data = miniData()
+	defer func() { Data = nil }()
+	a := NewAccount()
+	a.StartProgression()
+	a.refreshMiniQuests()
+	var row int32 = -1
+	for _, r := range miniSeasonalRows {
+		if a.owned(miniID(r)).Level == 0 {
+			row = r
+			break
+		}
+	}
+	if row < 0 {
+		t.Skip("every mini owned")
+	}
+	a.entry(miniID(row)).Level = 1
+	// the open ones stay; once a slot is free, the new mini is first
+	a.MiniQuests = nil
+	a.refreshMiniQuests()
+	if q := a.MiniQuests[0]; q.Index != int32(func() int {
+		for i, r := range miniSeasonalRows {
+			if r == row {
+				return i
+			}
+		}
+		return -1
+	}()*len(miniQuestWins)) {
+		t.Fatalf("not first: %+v", a.MiniQuests)
+	}
+	found := false
+	for _, q := range a.MiniQuests {
+		mini, _ := miniOfQuest(q)
+		found = found || (!q.Claimed && miniSeasonalRows[mini] == row)
+	}
+	if !found || len(a.MiniNew) != 1 || a.MiniNew[0] != row {
+		t.Fatalf("new mini %d: %+v new %v", row, a.MiniQuests, a.MiniNew)
+	}
+}
+
+// The day's hero quests name a hero, and the server leaves them to the
+// client.
+func TestHeroQuests(t *testing.T) {
+	for _, d := range todaysQuests() {
+		if d.Own["RequirementMini"] == heroOfDay {
+			t.Fatal("hero not set")
+		}
+	}
+	catalog := questCatalog
+	defer func() { questCatalog = catalog }()
+	r := playRumbles(2, rewardSmall)
+	questCatalog = []questDef{catalog[0], catalog[1], r, r, r, r, r}
+	a := NewAccount()
+	a.StartProgression()
+	a.refreshQuests()
+	a.questsAfterBattle(ModeDuel, 1)
+	a.BattleRounds(ModeDuel, 1, 3, 0)
+	for _, q := range a.Quests {
+		if q.Index < 2 && q.Progress != 0 {
+			t.Fatalf("server counted a hero quest %+v", a.Quests)
+		}
+	}
+	if n := todaysQuests()[0].Own["RequirementMini"]; n == heroOfDay || n == "" {
+		t.Fatalf("hero %v", n)
+	}
+}
