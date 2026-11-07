@@ -96,7 +96,7 @@ Also done:
   mini (0081).
 
 Still to do:
-- Clashmas quests (0087, 0088: under their header; to test): Clashmas was a time, not a single
+- Clashmas quests (0087; category 6, under their header, 0089; to test): Clashmas was a time, not a single
   event: in it the Clashmas quest group was on (QUEST_GROUP, event 3001),
   three of its quests at a time; 12 done unlock the Candy Elf (milestone,
   508), after that the group goes on with Crystal Coins. Our snapshot

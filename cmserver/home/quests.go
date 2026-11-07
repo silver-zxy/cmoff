@@ -42,11 +42,13 @@ type Quest struct {
 const (
 	questCategoryMini  int32 = 3 // "Tutorial", the quest screen's MINI QUESTS (0x71d454)
 	questCategoryDaily int32 = 2
-	// questCategoryGroup: none. With 1 (Season) the quest screen showed the
-	// group's quests under SEASONAL QUEST, not under the group's header;
-	// a group's live data has no Category, so the quests the client makes
-	// from it have none either (0088).
-	questCategoryGroup int32 = 0
+	// questCategoryGroup: 6, the timed event's block under the group's
+	// header (the quest screen's section by category, 0x5b5750: 1
+	// season_quest, 2 daily_quest, 3 tutorial_quest, 4 weekly_quest, 5
+	// competitive_quest, 6 timed_event_quest; anything else is the
+	// tutorial's). 1 put the Clashmas quests under SEASONAL QUEST (0087), 0
+	// under a second MINI QUESTS (0088).
+	questCategoryGroup int32 = 6
 	sourceQuest        int32 = 2
 )
 

@@ -352,6 +352,11 @@ Fifth test: still the old quest again, without rewards. Two causes:
   VInt event id (+0x60), VInt quests done (+0x70), the indices handed out
   (+0x80) and the milestones claimed (+0x90), each an int list (encoder
   0x31b9b4, decoder 0x4bd7d4).
+- The quest screen puts a quest in a section by its category (0x5b5750):
+  1 season_quest, 2 daily_quest, 3 tutorial_quest (MINI QUESTS), 4
+  weekly_quest, 5 competitive_quest, 6 timed_event_quest (the block under
+  a quest group's header); other values fall to the tutorial's. Group
+  quests take 6 (0089).
 - A battle copies only the active and chain quests (0x4f6854: +0x30,
   +0x50), not the group's: the server counts those (clashmasProgress, with
   the quest's unit in the selected deck or as the selected hero).
