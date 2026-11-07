@@ -177,3 +177,36 @@ func TestMiniQuestsOnlyNew(t *testing.T) {
 		t.Fatalf("starter minis got quests %+v", a.MiniQuests)
 	}
 }
+
+// A mini unlocked during the session: its quest at once, and the events
+// to send carry its chain.
+func TestNewMiniQuestsEvents(t *testing.T) {
+	Data = miniData()
+	defer func() { Data = nil }()
+	a := NewAccount()
+	a.StartProgression()
+	a.refreshMiniQuests()
+	if _, ok := a.NewMiniQuests(); ok {
+		t.Fatal("events without a new mini")
+	}
+	var row int32 = -1
+	for _, r := range miniSeasonalRows {
+		if a.owned(miniID(r)).Level == 0 {
+			row = r
+			break
+		}
+	}
+	a.entry(miniID(row)).Level = 1
+	events, ok := a.NewMiniQuests()
+	if !ok || len(a.MiniQuests) != 1 {
+		t.Fatalf("%v %+v", ok, a.MiniQuests)
+	}
+	mini, _ := miniOfQuest(a.MiniQuests[0])
+	found := false
+	for _, e := range events {
+		found = found || e.ID == miniChainEvent(mini)
+	}
+	if !found || miniSeasonalRows[mini] != row || a.MiniQuests[0].ID != a.QuestID {
+		t.Fatalf("chain event missing %+v", a.MiniQuests)
+	}
+}

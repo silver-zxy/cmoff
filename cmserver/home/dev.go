@@ -5,7 +5,8 @@ package home
 // everything at hand to test: every currency at its top, the Adventure
 // Road's fuel for all its tiers (to claim one by one), every open quest
 // done (to claim: daily, mini, Clashmas). Refilled with every home. The
-// season ends at every start (seasonend.go), so its end can be tested.
+// season ends at every start (seasonend.go), with the trophies set to
+// Diamond 1 (devTrophies) just before, so the reset can be seen.
 // Skins, units and trophies are earned as usual, so unlocking and upgrading
 // stay testable (the gold, gems and coins buy and upgrade everything).
 var Dev bool
@@ -56,4 +57,21 @@ func AccountFile(dev bool) string {
 		return "accounts-dev.json"
 	}
 	return "accounts.json"
+}
+
+// devTrophies: Diamond 1 (900-999); the season's end takes it to 800.
+const devTrophies int32 = 950
+
+// DevStart: dev mode at the server's start: the trophies to Diamond 1,
+// then the season ends.
+func (a *Account) DevStart() string {
+	a.Lock()
+	if a.Progression {
+		a.Trophies = max(a.Trophies, devTrophies)
+		if a.BestTrophies < a.Trophies {
+			a.BestTrophies = a.Trophies
+		}
+	}
+	a.Unlock()
+	return a.EndSeasonNow()
 }

@@ -226,3 +226,40 @@ func (a *Account) noteNewMinis() {
 	}
 	a.MiniNew = keep
 }
+
+// events: the account's live events as its home has them: the global ones,
+// the game modes of its league, its mini quest chains and the Clashmas
+// group. The caller holds the lock and has refreshed the quests.
+func (a *Account) events() []LiveEvent {
+	events := LiveEvents()
+	if e, ok := gameModeLiveEvent(a.Trophies); ok {
+		events = append(events, e)
+	}
+	if Live {
+		events = append(events, a.miniChainEvents()...)
+		if clashmasOn() && a.Progression {
+			events = append(events, clashmasLiveEvent())
+		}
+	}
+	return events
+}
+
+// NewMiniQuests hands out the mini quests of minis unlocked since the last
+// look (a chest, the shop, an upgrade during the session) and, if there
+// are any, returns the account's events for LogicUpdateChronosEventsCommand
+// 417: on an events update the client starts every QUEST_CHAIN event it has
+// no state for (0x682b80 -> 0x7b5e50 -> 0x52e6d0 -> 0x529788) with the
+// chain's first quest and the next quest id, as the server does here; so
+// the new mini's quest shows at once, not after the next home. The caller
+// holds the lock.
+func (a *Account) NewMiniQuests() ([]LiveEvent, bool) {
+	if !Live || !miniQuestsOn || !a.Progression {
+		return nil, false
+	}
+	before := a.QuestID
+	a.refreshMiniQuests()
+	if a.QuestID == before {
+		return nil, false
+	}
+	return a.events(), true
+}

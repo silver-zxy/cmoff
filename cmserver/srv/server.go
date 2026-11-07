@@ -527,6 +527,28 @@ func claimRewardServerCommand(ch home.PendingChest) []byte {
 // bool and the event collection 0x295f9c; execute 0x682b80).
 const cmdServerUpdateChronosEvents = 417
 
+// pushNewMiniQuests: a mini unlocked during the session gets its mini
+// quests at once: the account's events again with 417, the client starts
+// the new chain itself (home.NewMiniQuests). Not used: 0099 crashed the
+// client 0.8 s after the 417, while it opened a chest that unlocked minis
+// (0x529788 filling the chains -> 0x59c30c -> 0x4d2404 -> the season
+// manager 0x932d98 read a freed season object: 417 replaces the events,
+// and the season manager is linked to the new ones only when the flag at
+// 0x118abd8 is set, 0x7b5e50 / 0x3b4300).
+func (s *Server) pushNewMiniQuests(c net.Conn, sess *pepper.Session) {
+	s.acc.Lock()
+	events, ok := s.acc.NewMiniQuests()
+	s.acc.Unlock()
+	if !ok {
+		return
+	}
+	log.Printf("-> events again for a new mini's quests: %s", s.acc.QuestSummary())
+	s.send(c, sess, proto.AvailableServerCommand, chronosEventsServerCommand(events))
+	if err := s.acc.Save(); err != nil {
+		log.Printf("save account: %v", err)
+	}
+}
+
 // sendEvents sends the live events (home.LiveEvents) with 417.
 func (s *Server) sendEvents(c net.Conn, sess *pepper.Session) {
 	events := home.LiveEvents()

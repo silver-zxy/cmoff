@@ -207,8 +207,20 @@ Still to do:
   - trophies from Diamond 3 up back as in leagues.json (Diamond 3 / 2 to
     700, Diamond 1 800, Master 900, Grandmaster 1000, Legendary 1100);
   - Season 1 starts again.
+- Mini quests at once on unlock (0099) crashed the client: the 417 it
+  sends replaces the events while the season manager keeps a pointer to
+  the old ones (0x932d98, linked again only with the flag 0x118abd8).
+  Off again (0100); the quest comes with the next home. To find: how the
+  original did it without a crash.
+- Tested (7 November 2026): minis back to level 1, the road and star
+  chests. Dev mode sets the trophies to 950 before its season end, to see
+  the reset (0099).
 - Still to do: the popup "Season has ended!" / "Total Mini Stars"
-  (LogicSeasonEndCommand 451).
+  (LogicSeasonEndCommand 451: VInt, Int new season, Int, Long, Long, the
+  server command base; execute 0x95918c -> 0x48a4dc, where the client
+  makes the exchange itself: stars from the collectible levels, the
+  chests by stars as one chest of source 9, the trophy reset, the road;
+  the server then must not give them a second time).
 
 ### A9. News tab (dropped)
 

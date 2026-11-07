@@ -293,19 +293,14 @@ func (a *Account) ownHome() ownHomeData {
 	}
 	h.chestIndex = a.ChestIndex
 	h.daily = a.dailyGold()
-	h.events = LiveEvents()
-	if e, ok := gameModeLiveEvent(a.Trophies); ok {
-		h.events = append(h.events, e)
-	}
 	if Live {
 		a.refreshQuests()
 		a.refreshMiniQuests()
-		h.events = append(h.events, a.miniChainEvents()...)
 		a.refreshClashmas()
+	}
+	h.events = a.events()
+	if Live {
 		groups := clashmasOn() && a.Progression
-		if groups {
-			h.events = append(h.events, clashmasLiveEvent())
-		}
 		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken(), mini: a.MiniQuests,
 			clashmas: a.Clashmas, groups: groups}
 		// the server time, unix seconds: the tail's second VInt (msg +0x9c,

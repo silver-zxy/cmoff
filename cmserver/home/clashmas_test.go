@@ -178,3 +178,12 @@ func TestSeasonEnd(t *testing.T) {
 		t.Fatalf("trophies %d: %s", a.Trophies, msg)
 	}
 }
+
+// Dev mode's start: Diamond 1, then the season's end takes it to 800.
+func TestDevStart(t *testing.T) {
+	a := NewAccount()
+	a.StartProgression()
+	if msg := a.DevStart(); a.Trophies != 800 {
+		t.Fatalf("trophies %d: %s", a.Trophies, msg)
+	}
+}

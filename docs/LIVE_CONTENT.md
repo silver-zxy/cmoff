@@ -379,3 +379,18 @@ Fifth test: still the old quest again, without rewards. Two causes:
   empty (0091). The skins go in BasicModule's small buttons, which draw
   the chest's content from the game's cards (ui_cards.sc: skin_*);
   BundleModule draws its chests' content too.
+
+## Events update and new chains (0099)
+
+- On LogicUpdateChronosEventsCommand 417 the client replaces its events
+  (0x682b80 -> 0x6b7fe0), refreshes the quest manager (0x7b5e50 ->
+  0x30e304 -> 0x7a3250) and hands out quests for the new events
+  (0x52e6d0): the daily / weekly pools (0x7a4144), every QUEST_CHAIN event
+  without a state its first quest (0x529788), the groups (0x8d3a90).
+- 0099 sent the events again with 417 when a mini was unlocked, so the
+  client would start its chain at once. It crashed 0.8 s later, while the
+  client opened the chest that unlocked the minis: filling the chains
+  (0x529788 -> 0x59c30c -> 0x907f98 -> 0x4d2404) the season manager
+  (home +0x1c8, 0x932d98) read its season object, freed with the old
+  events. 0x7b5e50 links the season manager to the new events (0x4caa6c)
+  only when the flag 0x118abd8 (0x3b4300) is set. Off again (0100).

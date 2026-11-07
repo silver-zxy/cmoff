@@ -71,7 +71,7 @@ func main() {
 		log.Printf("%s", msg)
 	}
 	if home.Dev {
-		log.Printf("dev: %s", acc.EndSeasonNow())
+		log.Printf("dev: %s", acc.DevStart())
 	}
 	log.Printf("account %s: %q, deck %d %v, progression %v", *accPath, acc.Name, acc.Selected,
 		acc.Decks[acc.Selected], acc.Progression)
