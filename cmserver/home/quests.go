@@ -190,6 +190,11 @@ func (a *Account) questProgress(kind int32, n int32, match func(questDef) bool) 
 		if q.Claimed || d.TypeID != kind || q.Progress >= d.Target || (match != nil && !match(d)) {
 			continue
 		}
+		// a quest with a unit (the hero quests) only the client can
+		// count: it knows the battle's units (QuestsFromClient)
+		if name, _ := d.Own["RequirementMini"].(string); name != "" {
+			continue
+		}
 		q.Progress = min(q.Progress+n, d.Target)
 	}
 	a.clashmasProgress(kind, n, match)

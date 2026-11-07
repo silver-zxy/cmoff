@@ -95,6 +95,23 @@ Also done:
   and a chain's quest belongs in the chains' state, one chain event per
   mini (0081).
 
+Also (0090, to test):
+- Hero quests in the daily pool ("a larger pool of hero quests", patch
+  notes): win 6 rounds / play 3 matches using the day's hero (one of the
+  five starting heroes, by day), quest_daily_mystery_Hero (30-50 gold, a
+  Pony Fuel, 3 hero fragments). The client counts them in battle.
+- Mini quests come first for a newly unlocked mini (Deconstructor of
+  Fun: "triggered when a new unit is unlocked"); then, as ours, the
+  deck's minis and the others.
+- Seasonal quests: the client has the section (SEASONAL QUEST, category
+  1, a chain with Category "Season") but no quest of its own for it; no
+  source shows seasonal quests in December 2021, so none.
+- Found in the client, not built: a tutorial chain for new players
+  (TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_1-4: put Magic Archer / Shield
+  Skeleton in the deck, play a match using Wizard, upgrade a hero, play a
+  ranked match), a competitive chain ("Win N rounds in Duel or Rumble",
+  quest_Competitive_5W: 1 Crystal Coin), "Use N Crystal Coins".
+
 Still to do:
 - Clashmas quests (0087; category 6, under their header, 0089; to test): Clashmas was a time, not a single
   event: in it the Clashmas quest group was on (QUEST_GROUP, event 3001),

@@ -65,6 +65,10 @@ type Account struct {
 	// characters.csv row, how many of a mini's quests were claimed
 	MiniQuests []Quest         `json:"mini_quests,omitempty"`
 	MiniSteps  map[int32]int32 `json:"mini_steps,omitempty"`
+	// MiniSeen: the owned minis seen (seasonal rows); MiniNew: those
+	// unlocked since, in order, first for the mini quests (minis.go)
+	MiniSeen []int32 `json:"mini_seen,omitempty"`
+	MiniNew  []int32 `json:"mini_new,omitempty"`
 	// Clashmas: the Clashmas quest group (clashmas.go)
 	Clashmas  ClashmasState `json:"clashmas"`
 	Season    SeasonState   `json:"season"`
