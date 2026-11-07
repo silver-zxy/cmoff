@@ -198,6 +198,17 @@ func (a *Account) questProgress(kind int32, n int32, match func(questDef) bool) 
 		q.Progress = min(q.Progress+n, d.Target)
 	}
 	a.clashmasProgress(kind, n, match)
+	a.chainsProgress(kind, n, match)
+}
+
+// questsUpgraded: an upgrade of a collectible counts for MetaUpgrade,
+// for a quest of hero or unit upgrades only of that kind.
+func (a *Account) questsUpgraded(id int32) {
+	a.questProgress(questMetaUpgrade, 1, func(d questDef) bool {
+		u, _ := d.Own["UnitUpgrades"].(bool)
+		h, _ := d.Own["HeroUpgrades"].(bool)
+		return (!u && !h) || (h && isHero(id)) || (u && !isHero(id))
+	})
 }
 
 // questsAfterBattle: a finished battle counts for PlayGameMode and
@@ -267,6 +278,9 @@ func (a *Account) QuestsFromClient(progress [][2]int32) (changed []string) {
 				changed = append(changed, fmt.Sprintf("#%d mini %d/%d", q.ID, v, d.Target))
 			}
 		}
+		if c, ok := a.chainsFromClient(p[0], p[1]); ok {
+			changed = append(changed, c)
+		}
 		for i := range a.Quests {
 			q := &a.Quests[i]
 			if q.ID != p[0] || q.Claimed || int(q.Index) >= len(pool) {
@@ -301,7 +315,7 @@ func (a *Account) questsRoadTiers(n int32) {
 
 // ClaimQuest is 503: the quest's reward chest, made by the client.
 func (a *Account) ClaimQuest(r *Reward, id int32) bool {
-	if a.claimMiniQuest(r, id) || a.claimClashmasQuest(r, id) {
+	if a.claimMiniQuest(r, id) || a.claimClashmasQuest(r, id) || a.claimChainQuest(r, id) {
 		return true
 	}
 	a.refreshQuests()
@@ -416,7 +430,8 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 			open = append(open, q)
 		}
 	}
-	w.VInt(int32(len(open)))
+	w.VInt(int32(len(open) + len(s.chains)))
+	encodeChainQuests(w, s.chains, questsEnd(d))
 	for _, q := range open {
 		mini, step := miniOfQuest(q)
 		w.Int(miniChainEvent(mini))
@@ -479,6 +494,7 @@ func (a *Account) QuestSummary() string {
 		}
 	}
 	l = append(l, a.clashmasSummary()...)
+	l = append(l, a.chainsSummary()...)
 	return strings.Join(l, ", ")
 }
 
@@ -553,4 +569,5 @@ type questState struct {
 	// clashmas: the Clashmas group (clashmas.go), sent if groups
 	clashmas ClashmasState
 	groups   bool
+	chains   []chainQuest // the tutorial and competitive chains (chains.go)
 }

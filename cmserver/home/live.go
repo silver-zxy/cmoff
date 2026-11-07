@@ -214,6 +214,10 @@ var questCatalog = []questDef{
 	// ResourceData, 0x546b0c, we sent Resource)
 	{"MetaResourceGained", questResourceGained, "TID_CHRONOS_QUESTS_WINTROPHIES", 10,
 		rewardBig, map[string]any{"ResourceData": resourceRankPointsKey}},
+	// "Use N Crystal Coins" (MetaUsePromotionToken, its state writes
+	// nothing, 0xea9b90; the amount is ours): the shop's Crystal Coin skins
+	{"MetaUsePromotionToken", questMetaUseCoins, "TID_CHRONOS_QUESTS_META_USECHALLENGECOIN", 100,
+		rewardBig, map[string]any{}},
 }
 
 func playDuels(n int32, rewards []int32) questDef {

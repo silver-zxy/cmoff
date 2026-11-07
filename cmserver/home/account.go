@@ -68,6 +68,8 @@ type Account struct {
 	// WithheldExp: upgrade exp held back for the next level chests
 	// (pushUpgradeExp)
 	WithheldExp int32 `json:"withheld_exp,omitempty"`
+	// Chains: the tutorial and competitive quest chains (chains.go)
+	Chains []ChainState `json:"chains,omitempty"`
 	// LevelChests: player levels whose level chest was given.
 	LevelChests []int32 `json:"level_chests,omitempty"`
 	// Daily quests (quests.go): today's, the day, the last quest id.
@@ -312,12 +314,13 @@ func (a *Account) ownHome() ownHomeData {
 		a.refreshQuests()
 		a.refreshMiniQuests()
 		a.refreshClashmas()
+		a.refreshChains()
 	}
 	h.events = a.events()
 	if Live {
 		groups := clashmasOn() && a.Progression
 		h.quests = questState{quests: a.Quests, lastID: a.QuestID, rerolls: a.QuestRerolls, taken: a.questPoolTaken(), mini: a.MiniQuests,
-			clashmas: a.Clashmas, groups: groups}
+			clashmas: a.Clashmas, groups: groups, chains: a.chainQuests()}
 		// the server time, unix seconds: the tail's second VInt (msg +0x9c,
 		// 0x48b2e4) becomes the logic's time base (+0x1d4 via 0x85f100,
 		// 0x327c54; now = ticks/20 + base, 0x4df510). At 0 the events'
@@ -398,6 +401,7 @@ func (a *Account) Swap(mini, slot, slot2 int32) {
 	default:
 		d[slot] = -1
 	}
+	a.questProgress(questMetaChangeDeck, 1, nil)
 }
 
 // AddTroop: LogicAddTroopToDeckCommand 595 (global mini id, add or remove).
@@ -405,12 +409,13 @@ func (a *Account) AddTroop(global int32, add bool) {
 	row := global % 1_000_000
 	d := &a.Decks[a.Selected]
 	for j := range d {
-		if add && d[j] < 0 {
-			d[j] = row
-			return
-		}
-		if !add && d[j] == row {
-			d[j] = -1
+		if (add && d[j] < 0) || (!add && d[j] == row) {
+			if add {
+				d[j] = row
+			} else {
+				d[j] = -1
+			}
+			a.questProgress(questMetaChangeDeck, 1, nil)
 			return
 		}
 	}

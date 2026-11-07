@@ -137,7 +137,7 @@ Also (0090, tested):
 - Seasonal quests: the client has the section (SEASONAL QUEST, category
   1, a chain with Category "Season") but no quest of its own for it; no
   source shows seasonal quests in December 2021, so none.
-- Found in the client, not built: a tutorial chain for new players
+- Found in the client, built in 0114: a tutorial chain for new players
   (TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_1-4: put Magic Archer / Shield
   Skeleton in the deck, play a match using Wizard, upgrade a hero, play a
   ranked match), a competitive chain ("Win N rounds in Duel or Rumble",
@@ -291,6 +291,13 @@ Still to do:
   AbilityMask with CountStartUp 4, HitsReqInOneGame; ours: a match of 3
   rounds with the Prince in the deck counts, as a battle copies no group
   quests). "Win N Trophies" is back in the daily pool. To test.
+- 0114: the client's other quests: the tutorial chain for new players
+  (player level 3 or lower, once: deck with Magic Archer or Shield
+  Skeleton, a match using Wizard, a hero upgrade, a ranked match; under
+  MINI QUESTS), the competitive chain ("Win 5 rounds in Duel or Rumble",
+  1 Crystal Coin, again and again; its own section) and "Use 100 Crystal
+  Coins" in the daily pool (home/chains.go). Ours: the tutorial chain's
+  rewards and who gets it, the amounts. To test.
 - Open: 418 again, after 451's echo, so the road's rewards come apart
   from the star chest as in the original.
 

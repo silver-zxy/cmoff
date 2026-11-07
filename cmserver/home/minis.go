@@ -237,6 +237,7 @@ func (a *Account) events() []LiveEvent {
 	}
 	if Live {
 		events = append(events, a.miniChainEvents()...)
+		events = append(events, a.chainLiveEvents()...)
 		if clashmasOn() && a.Progression {
 			events = append(events, clashmasLiveEvent())
 		}

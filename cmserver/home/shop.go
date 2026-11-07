@@ -342,6 +342,7 @@ func (a *Account) BuyShopItem(r *Reward, event, item int32) (int32, string) {
 			return 0, "not enough crystal coins"
 		}
 		a.CrystalCoins -= it.Cost
+		a.questProgress(questMetaUseCoins, it.Cost, nil) // "Use N Crystal Coins"
 	}
 	a.Purchases = append(a.Purchases, Purchase{event, item})
 	var c ChestContent

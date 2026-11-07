@@ -216,7 +216,7 @@ func (a *Account) Upgrade(id, level int32) (*Reward, error) {
 		o.Level++
 		if o.Level > 1 { // an upgrade, not the unlock: its reward chest (+1 exp)
 			a.pushChest(r, upgradeRewardChest, sourceUpgrade, upgradeExpContent())
-			a.questProgress(questMetaUpgrade, 1, nil)
+			a.questsUpgraded(id)
 		}
 	}
 	return r, nil

@@ -61,16 +61,22 @@ func TestMiniQuests(t *testing.T) {
 	h := a.ownHome()
 	h.home.skinStore = false
 	m, err := decode(h.encode())
-	if err != nil || len(m.home.quests.quests) != questsPerDay || len(lastChains) != miniQuestsShown {
+	var miniChains []chainState // the tutorial and competitive chains apart (chains.go)
+	for _, c := range lastChains {
+		if c.event >= 1100 && c.event < 1200 {
+			miniChains = append(miniChains, c)
+		}
+	}
+	if err != nil || len(m.home.quests.quests) != questsPerDay || len(miniChains) != miniQuestsShown {
 		t.Fatalf("%v %d quests, chains %+v", err, len(m.home.quests.quests), lastChains)
 	}
 	events := map[int32]LiveEvent{}
 	for _, e := range m.home.events {
-		if e.Type == EventQuestChain {
+		if e.Type == EventQuestChain && e.ID >= 1100 && e.ID < 1200 {
 			events[e.ID] = e
 		}
 	}
-	for _, c := range lastChains {
+	for _, c := range miniChains {
 		// the decoded quest's index is its index in the chain: the step
 		var q Quest
 		for _, mq := range a.MiniQuests {

@@ -290,7 +290,7 @@ func (a *Account) autoUpgrade(r *Reward) (levels int32) {
 			}
 			r.Upgraded = append(r.Upgraded, id)
 			levels++
-			a.questProgress(questMetaUpgrade, 1, nil)
+			a.questsUpgraded(id)
 		}
 		if o.Level == 0 && o.Fragments == 0 {
 			delete(a.Collection, id)
