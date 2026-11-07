@@ -42,7 +42,11 @@ type Quest struct {
 const (
 	questCategoryMini  int32 = 3 // "Tutorial", the quest screen's MINI QUESTS (0x71d454)
 	questCategoryDaily int32 = 2
-	questCategoryGroup int32 = 1 // the group's quests have their own list
+	// questCategoryGroup: none. With 1 (Season) the quest screen showed the
+	// group's quests under SEASONAL QUEST, not under the group's header;
+	// a group's live data has no Category, so the quests the client makes
+	// from it have none either (0088).
+	questCategoryGroup int32 = 0
 	sourceQuest        int32 = 2
 )
 

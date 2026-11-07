@@ -195,7 +195,8 @@ func TestProgressionHome(t *testing.T) {
 	for _, kv := range m.home.collectibleLevels {
 		levels[kv[0]] = kv[1]
 	}
-	if levels[miniID(0)] != 1 || levels[heroID(12)] != 1 || levels[miniID(9)] != 0 || levels[globalID(classSkin, 59)] != 1 {
+	// skins: only the owned ones (none at the start, as in the original)
+	if levels[miniID(0)] != 1 || levels[heroID(12)] != 1 || levels[miniID(9)] != 0 || levels[globalID(classSkin, 59)] != 0 {
 		t.Fatalf("levels %v", levels)
 	}
 	if g := m.avatar.slots[0]; len(g) != 1 || g[0] != (dataSlot{classRESOURCES, resourceGold, starterGold}) {

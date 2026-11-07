@@ -234,6 +234,7 @@ type Reward struct {
 	Upgraded  []int32 // collectibles one level up (by the client itself)
 	Fragments map[int32]int32
 	Chests    []int32 // chests put into the home to be opened
+	Skins     []int32 // skins now owned
 	// SeasonPoints: Pony Fuel for the Adventure Road (season.go)
 	SeasonPoints int32
 	// CrystalCoins: PromotionToken
@@ -267,6 +268,9 @@ func (r *Reward) String() string {
 	}
 	for _, id := range r.Upgraded {
 		s += fmt.Sprintf(", upgraded %d", id)
+	}
+	for _, id := range r.Skins {
+		s += fmt.Sprintf(", skin %d", id)
 	}
 	ids := make([]int, 0, len(r.Fragments))
 	for id := range r.Fragments {
@@ -386,7 +390,9 @@ func (a *Account) fillCollection(m *ownHomeData) {
 		}
 	}
 	for _, r := range skinRows {
-		h.collectibleLevels = append(h.collectibleLevels, [2]int32{globalID(classSkin, r), 1})
+		if a.ownsSkin(globalID(classSkin, r)) {
+			h.collectibleLevels = append(h.collectibleLevels, [2]int32{globalID(classSkin, r), 1})
+		}
 	}
 	m.avatar.slots[2] = nil
 	m.avatar.slots[0] = []dataSlot{{class: classRESOURCES, instance: resourceGold, count: a.Gold}}

@@ -91,3 +91,25 @@ func TestClashmas(t *testing.T) {
 		t.Fatal("milestone twice")
 	}
 }
+
+// Skins as in the original: locked once for an account with progression,
+// a worn locked skin back to the default; a chest's skin is owned, can be
+// worn and is in the home's skin store.
+func TestSkinsLocked(t *testing.T) {
+	a := NewAccount()
+	a.StartProgression()
+	crystal := globalID(classSkin, 35)
+	a.Skins = map[int32]int32{36000017: crystal}
+	if !a.lockSkins() || len(a.Skins) != 0 || a.lockSkins() {
+		t.Fatalf("lock %+v", a.Skins)
+	}
+	a.SelectSkin(crystal)
+	if len(a.Skins) != 0 {
+		t.Fatal("a locked skin was worn")
+	}
+	a.addFragments(&Reward{}, crystal, 1)
+	a.SelectSkin(crystal)
+	if a.Skins[36000017] != crystal || !a.ownedSkinSet()[crystal] || len(a.ownedSkinSet()) != 1 {
+		t.Fatalf("owned %+v worn %+v", a.OwnedSkins, a.Skins)
+	}
+}

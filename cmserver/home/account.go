@@ -25,6 +25,10 @@ type Account struct {
 	NameSet bool `json:"name_set"`
 	// Skins: selected skin (global id) per mini/hero (collectible id).
 	Skins map[int32]int32 `json:"skins,omitempty"`
+	// OwnedSkins: the extra skins the player has (global ids, skins.go);
+	// SkinsLocked: the skins were locked as in the original once (0088)
+	OwnedSkins  []int32 `json:"owned_skins,omitempty"`
+	SkinsLocked bool    `json:"skins_locked,omitempty"`
 	// Trophies (RankPoints) from ranked battles, see ranked.go.
 	Trophies     int32 `json:"trophies"`
 	BestTrophies int32 `json:"best_trophies"`
@@ -249,6 +253,7 @@ func (a *Account) ownHome() ownHomeData {
 	h.heroExtra = globalID(classSupportHero, a.Heroes[a.Selected])
 	h.skinStore = true
 	h.skinSel = a.Skins
+	h.skinOwned = a.ownedSkinSet()
 	m.avatar.name = a.Name
 	m.avatar.nameSet = a.NameSet
 	// New players play the tutorial when Tutorial is on (tutorial flags 0).
@@ -328,6 +333,9 @@ func (a *Account) SelectSkin(skin int32) {
 		a.Skins = map[int32]int32{}
 	}
 	if extra {
+		if !a.ownsSkin(skin) {
+			return
+		}
 		a.Skins[owner] = skin
 	} else {
 		delete(a.Skins, owner)

@@ -51,6 +51,7 @@ type clientHome struct {
 	flags130          int32           // +0x130, 0 for a new account
 	skinStore         bool            // write the owned skins (skins.go)
 	skinSel           map[int32]int32 // selected skin per owner
+	skinOwned         map[int32]bool  // the owned extra skins; nil = all
 
 	chestIndex int32          // +0xb0: the last chest index handed out
 	chests     []PendingChest // +0x1b0: chests to open (chests_pending.go)
@@ -146,7 +147,7 @@ func (h *clientHome) encode(w *proto.Writer) {
 	encodeHomeTail(w)
 	encodeQuests(w, h.quests, h.daily)
 	h.encodeMaps(w)
-	encodeHomeEnd(w, h.skinStore, h.skinSel, h.season)
+	encodeHomeEnd(w, h.skinStore, h.skinSel, h.skinOwned, h.season)
 	encodeChests(w, h.chests)
 	encodeHomeEnd2(w, h.seasonSeen)
 }
@@ -273,7 +274,7 @@ func encodeHomeTail(w *proto.Writer) {
 }
 
 // encodeHomeEnd mirrors the client after the maps at +0x200.
-func encodeHomeEnd(w *proto.Writer, skinStore bool, skinSel map[int32]int32, season *SeasonState) {
+func encodeHomeEnd(w *proto.Writer, skinStore bool, skinSel map[int32]int32, skinOwned map[int32]bool, season *SeasonState) {
 	vints(w, 4)   // +0x188..+0x194
 	w.Bool(false) // +0xac
 	w.Bool(false)
@@ -288,7 +289,7 @@ func encodeHomeEnd(w *proto.Writer, skinStore bool, skinSel map[int32]int32, sea
 	vints(w, 2)
 	w.VInt(0)      // VInt list
 	if skinStore { // 0x7295d8 (+0x1c0), skins.go
-		encodeSkinStore(w, skinSel)
+		encodeSkinStore(w, skinSel, skinOwned)
 	} else {
 		w.VInt(0)
 	}
@@ -413,7 +414,7 @@ var (
 	// Prince_Fabulous, BarbarianKing_Jolly, MiniPekka_Helpful,
 	// GiantSkeleton_Gift, SpearGoblin_CandyElf, Bowler_Snowler, Archer_Sparkle.
 	// The other skins of collectibles.json were stripped from this build.
-	skinRows = []int32{59, 65, 70, 73, 80, 81, 89, 90, 91, 92, 93, 94, 95}
+	skinRows = []int32{35, 59, 65, 70, 73, 80, 81, 89, 90, 91, 92, 93, 94, 95}
 )
 
 // MiniLevel is the value written after each owned mini (mini object +0x10,

@@ -100,7 +100,7 @@ func decode(body []byte) (ownHomeData, error) {
 		}
 	}
 	// up to the season manager (its empty form is four VInt 0)
-	r.Skip(fixedLen(func(w *proto.Writer) { encodeHomeEnd(w, false, nil, nil) }) - 4)
+	r.Skip(fixedLen(func(w *proto.Writer) { encodeHomeEnd(w, false, nil, nil, nil) }) - 4)
 	m.home.season = decodeSeason(r)
 	m.home.chests = decodeChests(r)
 	// The manager's bool and the bool after it share a byte, with the last
@@ -236,7 +236,7 @@ func TestSkinStoreIndex(t *testing.T) {
 	}
 	read := func(sel map[int32]int32) map[int32][]int32 { // owner -> [idx, skins...]
 		w := proto.NewWriter()
-		encodeSkinStore(w, sel)
+		encodeSkinStore(w, sel, nil)
 		r := proto.NewReader(w.Bytes())
 		out := map[int32][]int32{}
 		for n := r.VInt(); n > 0; n-- {

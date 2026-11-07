@@ -96,7 +96,7 @@ Also done:
   mini (0081).
 
 Still to do:
-- Clashmas quests (0087, to test): Clashmas was a time, not a single
+- Clashmas quests (0087, 0088: under their header; to test): Clashmas was a time, not a single
   event: in it the Clashmas quest group was on (QUEST_GROUP, event 3001),
   three of its quests at a time; 12 done unlock the Candy Elf (milestone,
   508), after that the group goes on with Crystal Coins. Our snapshot
@@ -127,17 +127,23 @@ Still to do:
   past max level before 0074 turn into coins once at the start.
 - Spending them: with A5.
 
-### A5. Skins locked, unlocked as in the original
+### A5. Skins locked, unlocked as in the original (0088, to test)
 
-- Locked at the start (now all open). Decided: every account, the
-  existing ones too, starts with the skins locked as in the original;
-  they are unlocked again through the road, the quests and the shop.
-- Unlocked by: the road (Plush P.E.K.K.A, Luchador Monk), the Clashmas
-  quests (Candy Elf), the shop (Jolly, Helpful, Crystal P.E.K.K.A,
-  Fabulous Prince, the Clashmas Skins bundle).
-- A skin owned is never lost; what the client does with one it owns
-  ("You already own this Skin!") and how the home holds owned skins: to
-  check.
+- Every account, the existing ones too, starts with only the default
+  skins (locked once at the start; a locked skin worn goes back to the
+  default). A skin is owned once a chest gives it, and never lost.
+- Unlocked by (0088): the road (Plush P.E.K.K.A tier 26, Luchador Monk
+  tier 87), the Clashmas quests (Candy Elf, 12 quests).
+- Still to do: the shop's skins (Jolly 159 gems, Helpful 99 gems, the
+  Clashmas Skins bundle free, Crystal P.E.K.K.A 100 and Fabulous Prince
+  600 Crystal Coins; their chests are in chests.json:
+  shop_skin_pekkaCrystal, _PrinceFabulous, _BarbarianKingJolly,
+  _MiniPekkaWindup, _GiantSkeletonGift, _BowlerSnowler, _ArcherSparkle).
+- The older skins (Celtic Magic Archer, Scientist Electro Wizard,
+  Gravedigger Miner, Victory Shield Maiden) were not on sale in December
+  2021: they stay locked unless we learn more (B8).
+- The Crystal P.E.K.K.A was missing from our skin list (it was locked
+  even in the unlocked collection); added (0088).
 
 ### A6. Season 1 road: 90 tiers (0065; tested)
 
@@ -193,6 +199,9 @@ videos, r/ClashMini), the wiki's Mini Pass page as text.
   gold.
 - ~~B6. Crystal Prince skin~~: its chest (shop_skin_PrinceCrystal) gives
   the Fabulous skin (44000089); there is no Crystal Prince skin.
+- **B8. Older skins**: how Celtic Magic Archer, Scientist Electro Wizard,
+  Gravedigger Miner and Victory Shield Maiden were unlocked before
+  December 2021 (shop? season 0?).
 - **B7. Clashmas Skins bundle**: "+160% extra" hints at more than the
   three skins (gems, gold?).
 

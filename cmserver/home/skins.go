@@ -36,6 +36,7 @@ var skinTable = []skinInfo{
 	{30, 36000022, false},  // ElectroWizardlv1 (ElectroWizardB1)
 	{31, 36000008, false},  // IceWizardlv1 (IceWizardB1)
 	{32, 36000017, false},  // Pekkalv1 (PekkaB1)
+	{35, 36000017, true},   // PekkaSkin_Crystal (PekkaB1)
 	{36, 36000012, false},  // MiniPekkalv1 (MiniPekkaB1)
 	{39, 36000006, false},  // Wizardlv1 (WizardB1)
 	{40, 36000015, false},  // Princelv1 (PrinceB1)
@@ -82,12 +83,14 @@ func SkinOwner(skinGlobal int32) (owner int32, extra, ok bool) {
 // default skin first, then the extra skins; the entry's +0x18 is the INDEX of
 // the worn skin in that list (0x8d90d8 stores the index; choosing the default
 // skin appends it to the list first, 0x8fcff8). sel maps owner -> chosen skin
-// global id; missing or unknown = default (index 0).
-func encodeSkinStore(w *proto.Writer, sel map[int32]int32) {
+// global id; missing or unknown = default (index 0). owned: the extra
+// skins the player has (global ids); nil = all of them (the unlocked
+// collection without progression).
+func encodeSkinStore(w *proto.Writer, sel map[int32]int32, owned map[int32]bool) {
 	var owners []int32
 	skins := map[int32][]int32{}
 	for _, s := range skinTable {
-		if !s.extra {
+		if !s.extra || (owned != nil && !owned[globalID(classSkin, s.row)]) {
 			continue
 		}
 		if _, seen := skins[s.owner]; !seen {
@@ -122,4 +125,60 @@ func defaultSkin(owner int32) int32 {
 		}
 	}
 	return 0
+}
+
+// Skins as in the original (variant B, 0088): every account, the existing
+// ones too, starts with only the default skins; an extra skin is owned once
+// a chest gives it (the road's Plush P.E.K.K.A and Luchador Monk, the
+// Clashmas quests' Candy Elf, the shop's skins). A skin owned is never lost.
+
+// ownSkin: a chest gave a skin (global id, class 44).
+func (a *Account) ownSkin(skin int32) {
+	for _, s := range a.OwnedSkins {
+		if s == skin {
+			return
+		}
+	}
+	a.OwnedSkins = append(a.OwnedSkins, skin)
+}
+
+// ownsSkin: the player has the extra skin (all of them without progression).
+func (a *Account) ownsSkin(skin int32) bool {
+	if !a.Progression {
+		return true
+	}
+	for _, s := range a.OwnedSkins {
+		if s == skin {
+			return true
+		}
+	}
+	return false
+}
+
+// ownedSkinSet: the owned extra skins for the home; nil = all.
+func (a *Account) ownedSkinSet() map[int32]bool {
+	if !a.Progression {
+		return nil
+	}
+	m := map[int32]bool{}
+	for _, s := range a.OwnedSkins {
+		m[s] = true
+	}
+	return m
+}
+
+// lockSkins: once per account, the skins as in the original: a locked
+// skin worn goes back to the default. Returns whether it changed the
+// account.
+func (a *Account) lockSkins() bool {
+	if a.SkinsLocked || !a.Progression {
+		return false
+	}
+	a.SkinsLocked = true
+	for owner, skin := range a.Skins {
+		if !a.ownsSkin(skin) {
+			delete(a.Skins, owner)
+		}
+	}
+	return true
 }
