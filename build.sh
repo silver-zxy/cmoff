@@ -15,6 +15,11 @@
 # tutorial and pick their starting hero (cmserver -tutorial).
 # LIVE=on|off (standalone, default on): quest settings and quest events
 # (docs/LIVE_CONTENT.md; cmserver -live).
+# DEV=on|off (standalone, default off): dev mode for testing, an account of
+#   its own (accounts-dev.json; the real one stays as it is) with every
+#   currency at its top, the Adventure Road's fuel for all tiers and every
+#   open quest done, refilled with every home. Build again without DEV to
+#   play the real account.
 # WIN_FRAGMENTS=on|off (standalone, default off): won battles also bring
 # fragments; the original gave gold only (cmserver -win-fragments).
 # CHESTS=on|off (standalone, default on): rewards (win fragments, upgrade
@@ -93,11 +98,12 @@ standalone)
     case "${CHESTS:=on}" in on|off) ;; *) die "CHESTS must be on or off" ;; esac
     case "${LIVE:=on}" in on|off) ;; *) die "LIVE must be on or off" ;; esac
     case "${WIN_FRAGMENTS:=off}" in on|off) ;; *) die "WIN_FRAGMENTS must be on or off" ;; esac
-    echo "progression: $PROGRESSION, tutorial: $TUTORIAL, chests: $CHESTS, live: $LIVE, win fragments: $WIN_FRAGMENTS"
+    case "${DEV:=off}" in on|off) ;; *) die "DEV must be on or off" ;; esac
+    echo "progression: $PROGRESSION, tutorial: $TUTORIAL, chests: $CHESTS, live: $LIVE, win fragments: $WIN_FRAGMENTS, dev: $DEV"
     opt=$PROGRESSION
     [ "$opt" = reset ] && opt="reset:$(date +%s)"
     build_hook -DCMOFFLINE_NO_CRASH_LOGGER -DCMOFFLINE_LOCAL_SERVER "-DSERVER_KEY_HEX=\"$priv\"" \
-        "-DCMSERVER_OPTIONS=\"progression=$opt tutorial=$TUTORIAL chests=$CHESTS live=$LIVE winfragments=$WIN_FRAGMENTS\""
+        "-DCMSERVER_OPTIONS=\"progression=$opt tutorial=$TUTORIAL chests=$CHESTS live=$LIVE winfragments=$WIN_FRAGMENTS dev=$DEV\""
     python3 "$ROOT/cmoffline/tools/patch_apk.py" "$apk" "$OUT/libcmoffline.so" \
         "$OUT/unsigned.apk" "$pub" --add-lib "$OUT/libcmserver.so" \
         --help-page "$ROOT/cmoffline/help/help.html"

@@ -113,3 +113,27 @@ func TestSkinsLocked(t *testing.T) {
 		t.Fatalf("owned %+v worn %+v", a.OwnedSkins, a.Skins)
 	}
 }
+
+// Dev mode: the currencies at their top, the road's fuel, every quest
+// done, with every home.
+func TestDevMode(t *testing.T) {
+	Dev = true
+	defer func() { Dev = false }()
+	a := NewAccount()
+	a.StartProgression()
+	a.Gold = 5
+	a.ownHome()
+	if a.Gold != devGold || a.Gems != devGems || a.CrystalCoins != devCoins ||
+		a.Season.Points != seasonTiers[len(seasonTiers)-1].Points {
+		t.Fatalf("gold %d gems %d coins %d fuel %d", a.Gold, a.Gems, a.CrystalCoins, a.Season.Points)
+	}
+	pool := todaysQuests()
+	for _, q := range a.Quests {
+		if q.Progress != pool[q.Index].Target {
+			t.Fatalf("quest not done %+v", q)
+		}
+	}
+	if AccountFile(true) == AccountFile(false) {
+		t.Fatal("dev mode shares the account")
+	}
+}
