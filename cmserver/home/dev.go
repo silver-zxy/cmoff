@@ -4,7 +4,8 @@ package home
 // of its own (accounts-dev.json, so the real one stays as it is) with
 // everything at hand to test: every currency at its top, the Adventure
 // Road's fuel for all its tiers (to claim one by one), every open quest
-// done (to claim: daily, mini, Clashmas). Refilled with every home.
+// done (to claim: daily, mini, Clashmas). Refilled with every home. The
+// season ends at every start (seasonend.go), so its end can be tested.
 // Skins, units and trophies are earned as usual, so unlocking and upgrading
 // stay testable (the gold, gems and coins buy and upgrade everything).
 var Dev bool

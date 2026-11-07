@@ -70,6 +70,9 @@ func main() {
 	if msg := acc.CatchUp(); msg != "" {
 		log.Printf("%s", msg)
 	}
+	if home.Dev {
+		log.Printf("dev: %s", acc.EndSeasonNow())
+	}
 	log.Printf("account %s: %q, deck %d %v, progression %v", *accPath, acc.Name, acc.Selected,
 		acc.Decks[acc.Selected], acc.Progression)
 

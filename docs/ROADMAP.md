@@ -43,6 +43,16 @@ the phone before the next.
   Crystal Coins (A4), the Adventure Road with 90 tiers and the free Mini
   Pass (A6, A7), the help page.
 
+## Decisions (7 November 2026): close to the original
+
+- Season end: the star exchange as in December 2021 (minis back to level
+  1, rewards by stars); the choice of March 2022 is not in our client.
+- Mini quests only for newly unlocked minis, as in the original.
+- The Clashmas quests end after their list (each known quest once).
+- Mini Pass and the Clashmas Skins bundle stay free; no gem packs or
+  other real-money offers.
+- The four older skins are everyone's (how they were sold is not known).
+
 ## Part A: what we know
 
 ### A0. Boards by league (0071, 0072; tested)
@@ -180,17 +190,21 @@ Still to do:
   (P.L.U.S.H. P.E.K.K.A at tier 26, Luchador Monk at 87, wiki), 200 gems,
   2000 gold.
 
-### A8. Season end (every two months)
+### A8. Season end (every two months) (0096, to test)
 
-- Optional star exchange (the best variant, from March 2022; in our
-  version it was forced): season_rewards.csv by total stars (6..50):
-  gold 500–4000, gems 10–100, Crystal Coins 0–5, fragments. How the
-  client counts and shows it: read from the code (B4 if not there).
-- Road rewards not claimed come automatically (418).
-- Trophies reset as in leagues.json: from Diamond 3 up back to
-  700 .. 1100; below Diamond nothing changes. No rank rewards (none in
-  1.1143.2).
-- The new season's popup (451); Season 1 starts again.
+- When the season key changes (dev mode: at every start):
+  - the road's tiers reached and not claimed come as a chest (both lanes;
+    418 in the original);
+  - the star exchange as in December 2021 (decided: the choice of March
+    2022 has no screen in our client): every mini back to level 1, for 6
+    or more stars the tier's chests of season_rewards.csv (the three
+    EndStars_Min_*_Cost with mini fragments and EndStars_1..9: 500-4000
+    gold, 10-100 gems, up to 5 Crystal Coins, fragments);
+  - trophies from Diamond 3 up back as in leagues.json (Diamond 3 / 2 to
+    700, Diamond 1 800, Master 900, Grandmaster 1000, Legendary 1100);
+  - Season 1 starts again.
+- Still to do: the popup "Season has ended!" / "Total Mini Stars"
+  (LogicSeasonEndCommand 451).
 
 ### A9. News tab (dropped)
 

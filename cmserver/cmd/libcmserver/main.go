@@ -85,6 +85,10 @@ func CmServerStart(dataDir, keyHex, options *C.char) C.int {
 		if msg := acc.CatchUp(); msg != "" {
 			log.Printf("%s", msg)
 		}
+		if home.Dev {
+			// dev mode: the season ends at every start, to test it
+			log.Printf("dev: %s", acc.EndSeasonNow())
+		}
 		log.Printf("account %q in %s, progression %v, dev %v", acc.Name, dir, acc.Progression, home.Dev)
 		s := srv.New(key, acc, srv.Options{BattleOnline: true})
 		go func() { log.Printf("server stopped: %v", s.Serve(ln)) }()

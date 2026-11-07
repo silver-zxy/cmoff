@@ -27,8 +27,11 @@ type Account struct {
 	Skins map[int32]int32 `json:"skins,omitempty"`
 	// OwnedSkins: the extra skins the player has (global ids, skins.go);
 	// SkinsLocked: the skins were locked as in the original once (0088)
-	OwnedSkins  []int32 `json:"owned_skins,omitempty"`
-	SkinsLocked bool    `json:"skins_locked,omitempty"`
+	OwnedSkins []int32 `json:"owned_skins,omitempty"`
+	// LastSeasonEnd: what the last season's end gave (seasonend.go), until
+	// logged
+	LastSeasonEnd string `json:"-"`
+	SkinsLocked   bool   `json:"skins_locked,omitempty"`
 	// Trophies (RankPoints) from ranked battles, see ranked.go.
 	Trophies     int32 `json:"trophies"`
 	BestTrophies int32 `json:"best_trophies"`

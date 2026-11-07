@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 )
 
 // The Clashmas group: three quests open, sent in the group list with the
@@ -135,5 +136,39 @@ func TestDevMode(t *testing.T) {
 	}
 	if AccountFile(true) == AccountFile(false) {
 		t.Fatal("dev mode shares the account")
+	}
+}
+
+// The season's end: the road's tiers reached come, the minis' stars are
+// exchanged (back to level 1, the tier's chests), trophies from Diamond 3
+// up go back; a new season starts.
+func TestSeasonEnd(t *testing.T) {
+	Data = shopData()
+	defer func() { Data = nil }()
+	day := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
+	now = func() time.Time { return day }
+	defer func() { now = time.Now }()
+	a := NewAccount()
+	a.StartProgression()
+	a.season().Points = 10
+	for i, r := range miniSeasonalRows {
+		if i < 4 {
+			a.entry(miniID(r)).Level = 4 // 3 stars each: 12
+		}
+	}
+	a.Trophies = 950
+	chests := len(a.Chests)
+	day = day.AddDate(0, 3, 0)
+	s := a.season()
+	if s.Points != 0 || a.Trophies != 800 || len(a.Chests) != chests+2 || a.miniStars() != 0 {
+		t.Fatalf("points %d trophies %d chests %d stars %d: %s", s.Points, a.Trophies, len(a.Chests)-chests, a.miniStars(), a.LastSeasonEnd)
+	}
+	if a.owned(miniID(miniSeasonalRows[0])).Level != 1 {
+		t.Fatal("stars kept")
+	}
+	// below Diamond 3 the trophies stay; under 6 stars no star chest
+	a.Trophies = 650
+	if msg := a.EndSeasonNow(); a.Trophies != 650 || msg == "" {
+		t.Fatalf("trophies %d: %s", a.Trophies, msg)
 	}
 }

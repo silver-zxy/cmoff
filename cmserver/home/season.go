@@ -170,6 +170,9 @@ func (a *Account) season() *SeasonState {
 		a.Season.Key = k
 	}
 	if a.Season.Key != k {
+		if a.Season.Key != 0 {
+			a.LastSeasonEnd = a.endSeason()
+		}
 		a.Season = SeasonState{Key: k}
 	}
 	return &a.Season
@@ -203,7 +206,11 @@ func (a *Account) ClaimSeasonRewards(r *Reward) (tiers int) {
 	if !Live {
 		return 0
 	}
-	s := a.season()
+	return a.claimSeason(r, a.season())
+}
+
+// claimSeason claims the tiers s reached and has not claimed.
+func (a *Account) claimSeason(r *Reward, s *SeasonState) (tiers int) {
 	var c ChestContent
 	first := int32(0)
 	take := func(chests []int32) {

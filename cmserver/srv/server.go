@@ -475,6 +475,12 @@ func (s *Server) sendHome(c net.Conn, sess *pepper.Session) {
 	if q := s.acc.QuestSummary(); q != "" {
 		log.Printf("-> home with quests: %s", q)
 	}
+	s.acc.Lock()
+	ended := s.acc.TakeSeasonEnd()
+	s.acc.Unlock()
+	if ended != "" {
+		log.Printf("-> home after the season's end: %s", ended)
+	}
 	if home.Live {
 		k, pts, claimed := s.acc.SeasonSummary()
 		log.Printf("-> home with adventure road: season %d, %d pony fuel, claimed up to %d", k, pts, claimed)
