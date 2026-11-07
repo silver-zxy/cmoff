@@ -329,8 +329,18 @@ Still to do:
   Mini Room. The deck step counts any deck change also
   in the original (its tooltip: "Modify your deck to complete this
   Quest"; the tutorial's deck builder guides the player to the new mini).
-- Open: 418 again, after 451's echo, so the road's rewards come apart
-  from the star chest as in the original.
+- 0121: the currency shop at the end, as the original's "Gold Rush" and
+  "Gems Galore" (PermCurrencyModule, the game's shop_gold_* and
+  shop_gems_* chests): 1000 / 2500 / 8000 gold for 60 / 150 / 450 gems
+  (10 a day), 50 / 300 / 1000 gems free (real money in the original),
+  once a day. The packs and prices are ours. 0125: the gem packs cost
+  5000 / 25000 / 75000 gold (decided: free they made gems worthless; a gem
+  costs 75-100 gold and gives 16-18 in the gold packs, so going round
+  does not pay).
+- Tested 7 November 2026: everything from 0112 to 0121 works on the
+  phone. The offline mode is done; next: the Mini Room (A10).
+- 418 (the road's rewards apart from the star chest): not a goal (0111
+  dropped).
 
 ### A9. News tab (dropped)
 

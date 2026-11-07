@@ -38,8 +38,9 @@ import (
 // A new shop every day (UTC), its own event id per day so the limits start
 // anew; a skin owned counts as bought in every day's shop (the home's
 // purchases), so it stays "Purchased". The chests are the game's shop
-// chests (shop_unit_*, shop_miniHero_*_25, shop_skin_*). Left out: gem
-// packs and the other bundles (real money).
+// chests (shop_unit_*, shop_miniHero_*_25, shop_skin_*). At the end gold
+// for gems and free gem packs (0121). Left out: the other bundles (real
+// money).
 
 // sourceShop: a chest bought in the shop (0x932bf4).
 const sourceShop int32 = 4
@@ -162,7 +163,45 @@ func shopModules(day int32) []shopModule {
 			{Chest: chestSkinCrystalPekka, Resource: "PromotionToken", Cost: 100, Limit: 1},
 			{Chest: chestSkinFabulous, Resource: "PromotionToken", Cost: 600, Limit: 1},
 		}},
+		{"PermCurrencyModule", "TID_CHRONOS_SHOP_TITLE_CURRENCY_GOLD", currencyItems(shopGoldPacks, "Diamonds", shopGoldLimit)},
+		{"PermCurrencyModule", "TID_CHRONOS_SHOP_TITLE_CURRENCY_GEMS", currencyItems(shopGemPacks, "Gold", shopGemLimit)},
 	}
+}
+
+// The currency shop at the end (0121; the client's titles "Gold Rush" and
+// "Gems Galore", PermCurrencyModule, the game's shop_gold_* and
+// shop_gems_* chests). Gold for gems; the gem packs cost real money in
+// the original (50 for 1.99 $ ... 5000 for 99.99 $), here they cost gold,
+// each once a day (decided 8 November 2026: free, 1350 gems a day made gems
+// worthless). A gem costs 75-100 gold here and gives 16-18 gold in the
+// gold packs, so going round does not pay. The packs and prices are ours.
+var (
+	shopGoldPacks = []struct {
+		chest string
+		cost  int32
+	}{{"shop_gold_1000", 60}, {"shop_gold_2500", 150}, {"shop_gold_8000", 450}}
+	shopGemPacks = []struct {
+		chest string
+		cost  int32
+	}{{"shop_gems_50", 5000}, {"shop_gems_300", 25000}, {"shop_gems_1000", 75000}}
+)
+
+const (
+	shopGoldLimit int32 = 10 // a day (ours)
+	shopGemLimit  int32 = 1  // a day (decided)
+)
+
+func currencyItems(packs []struct {
+	chest string
+	cost  int32
+}, resource string, limit int32) []shopItem {
+	var out []shopItem
+	for _, p := range packs {
+		if id, ok := Data.ChestByName(p.chest); ok {
+			out = append(out, shopItem{Chest: id, Resource: resource, Cost: p.cost, Limit: limit})
+		}
+	}
+	return out
 }
 
 // The skin chests (chests.json), each the one skin.
@@ -247,6 +286,9 @@ func shopLiveEvent() LiveEvent {
 	end := start.AddDate(0, 0, 1)
 	var modules []any
 	for _, m := range shopModules(day) {
+		if len(m.Items) == 0 {
+			continue // (the currency packs without the game's chests)
+		}
 		var items []any
 		for _, it := range m.Items {
 			button := "SmallIcon"

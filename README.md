@@ -11,23 +11,28 @@ needed).
 snapshot of Clashmas 2021 (Season 1, the Clashmas shop and quests), close to
 the original, with real-money items free ([docs/ROADMAP.md](docs/ROADMAP.md)).
 
-What works:
+What works (the offline mode is done, tested on the phone):
 
 | | |
 |---|---|
 | Login, home, decks, heroes, skins and your name are saved | ✅ |
-| Duel and Rumble against the game's bots, with their own decks and levels for your league | ✅ |
+| Duel and Rumble against the game's bots, with their own decks and levels for your league, on the league's boards | ✅ |
 | In-battle upgrades, Exit back to the home | ✅ |
 | Trophies (rank points) and gold as the game data gives them; casual stays casual | ✅ |
 | Profile statistics, win streaks, player level (EXP from upgrades, as in the original) | ✅ |
-| Progression: start with the game's starting values and chests, earn gold and fragments, unlock and upgrade minis and heroes (or everything unlocked: `PROGRESSION=unlocked`) | ✅ |
+| Progression: start with the game's starting values and chests, earn gold and fragments, unlock and upgrade minis and heroes (or everything unlocked: `PROGRESSION=unlocked`); fragments past max level become Crystal Coins | ✅ |
 | Chest openings in the home (quest rewards, shop, road, upgrade exp, level chests; `CHESTS=off`: straight into the account) | ✅ |
-| Daily quests: six a day, reroll, the game's rewards (Pony Fuel and gold) | 🧪 |
-| Adventure Road: Season 1 with 90 tiers, the Mini Pass lane free | 🧪 |
-| Shop: daily minis for gold and heroes for gems at the original prices | 🧪 |
-| Help and Support: our own help page | 🧪 |
-| Skins to unlock, Clashmas quests, season end | ❌ (roadmap) |
-| Real PvP | ❌ |
+| Daily quests: six a day, hero quests, reroll, counted in battle by the game itself | ✅ |
+| Mini quests for every newly unlocked mini, at once; the tutorial quests for new players; "Win 5 rounds" for a Crystal Coin, again and again | ✅ |
+| Clashmas quests with the Candy Elf skin after 12 | ✅ |
+| Adventure Road: Season 1 with 90 tiers, the Mini Pass lane free | ✅ |
+| Season end every two months: the "Season has ended!" popup, the star chest, trophy reset | ✅ |
+| Skins locked as in the original, unlocked through the road, the Clashmas quests and the shop | ✅ |
+| Shop: daily minis and heroes, the Clashmas skins, Crystal Coin skins, gold for gems, gems for gold | ✅ |
+| Help and Support: our own help page | ✅ |
+| Dev mode for testing (`DEV=on`) | ✅ |
+| Mini Room | ❌ (next) |
+| Real PvP | ❌ (much later) |
 
 Nothing of Supercell's is in this repository: no APK, no game code, no game
 data, no Supercell keys. You patch **your own copy** of the game. The server

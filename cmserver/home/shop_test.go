@@ -3,6 +3,7 @@ package home
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 )
@@ -193,5 +194,48 @@ func TestQuestPoolDaily(t *testing.T) {
 	}
 	if len(seen) < 4 {
 		t.Fatalf("pools barely change: %d different in 7 days", len(seen))
+	}
+}
+
+// The currency shop at the end: gold for gems, gem packs for gold once a day.
+func TestShopCurrency(t *testing.T) {
+	apk := os.Getenv("CMSERVER_TEST_APK")
+	if apk == "" {
+		t.Skip("CMSERVER_TEST_APK not set")
+	}
+	d, err := LoadGameData(apk)
+	if err != nil {
+		t.Skip(err)
+	}
+	Data = d
+	defer func() { Data = nil }()
+	a := NewAccount()
+	a.StartProgression()
+	a.Gold, a.Gems = 0, 100
+	mods := shopModules(shopDay(now().UTC()))
+	gold, gems := mods[len(mods)-2], mods[len(mods)-1]
+	if gold.Name != "PermCurrencyModule" || len(gold.Items) != 3 || len(gems.Items) != 3 {
+		t.Fatalf("%+v %+v", gold, gems)
+	}
+	idx := int32(0)
+	for _, m := range mods[:len(mods)-2] {
+		idx += int32(len(m.Items))
+	}
+	ev := shopLiveEvent()
+	if c, why := a.BuyShopItem(&Reward{}, ev.ID, idx); c == 0 || a.Gems != 40 {
+		t.Fatalf("gold pack: %s, gems %d", why, a.Gems)
+	}
+	// gem packs for gold, once a day
+	gem := idx + 3
+	if c, _ := a.BuyShopItem(&Reward{}, ev.ID, gem); c != 0 {
+		t.Fatal("gem pack without the gold")
+	}
+	a.Gold = 6000
+	if c, why := a.BuyShopItem(&Reward{}, ev.ID, gem); c == 0 || a.Gold != 1000 || a.Gems != 40 {
+		t.Fatalf("gem pack: %s, gold %d gems %d", why, a.Gold, a.Gems)
+	}
+	a.Gold = 6000
+	if c, _ := a.BuyShopItem(&Reward{}, ev.ID, gem); c != 0 {
+		t.Fatal("gem pack twice a day")
 	}
 }
