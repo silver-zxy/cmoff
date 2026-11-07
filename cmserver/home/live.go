@@ -149,6 +149,7 @@ const (
 	questWinRumble        int32 = 19
 	questSeasonRoadLevel  int32 = 24
 	questResourceGained   int32 = 25
+	questAbilityHit       int32 = 23
 	questPlayGameMode     int32 = 26
 	resourceRankPoints    int32 = 12 // resources.csv row of the trophies
 	resourceRankPointsKey       = "RankPoints"
@@ -208,9 +209,11 @@ var questCatalog = []questDef{
 		rewardSmall, map[string]any{}},
 	{"UpgradeUnit", questUpgradeUnit, "TID_CHRONOS_QUESTS_UPGRADEUNIT", 5,
 		rewardSmall, map[string]any{}},
-	// Not "Win N Trophies" (MetaResourceGained): a quest of that kind the
-	// client made from the pool crashed the quest screen (its hint,
-	// 0x834d64, found no resource), 0075.
+	// "Win N Trophies": out from 0075 to 0113, its hint crashed the quest
+	// screen (0x834d64 found no resource: the live data's key is
+	// ResourceData, 0x546b0c, we sent Resource)
+	{"MetaResourceGained", questResourceGained, "TID_CHRONOS_QUESTS_WINTROPHIES", 10,
+		rewardBig, map[string]any{"ResourceData": resourceRankPointsKey}},
 }
 
 func playDuels(n int32, rewards []int32) questDef {

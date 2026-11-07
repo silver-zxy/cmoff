@@ -367,6 +367,10 @@ func decodeQuest(r *proto.Reader) Quest {
 		case questWinWithUnit:
 			r.Bool()
 			r.VInt()
+		case questAbilityHit:
+			r.VInt()
+			r.VInt()
+			r.VInt()
 		}
 	}
 	_ = r.String()

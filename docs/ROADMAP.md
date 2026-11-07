@@ -163,9 +163,8 @@ Still to do:
   | Win 3 matches using Musketeer | 10 Crystal Coins |
   | Play 10 rumbles | 15 Crystal Coins |
 
-  Left out: "Win 10 trophies" (100 gold; MetaResourceGained crashed the
-  quest screen, 0075) and "Prince charges 3 enemies in a match" (10
-  Crystal Coins, 10 gems; AbilityHitInOneGame, state not known).
+  | Win 10 trophies (0113) | 100 gold |
+  | Use Prince to Charge 3 enemies in a single match (0113) | 10 Crystal Coins, 10 gems |
 
 ### A4. Crystal Coins (0065, 0074; tested)
 
@@ -285,6 +284,13 @@ Still to do:
 - 0112: mini quests at once on unlock again: 417, and the hook links the
   season manager to the new events after it (docs/LIVE_CONTENT.md). To
   test.
+- 0113: the two Clashmas quests left out are in: "Win 10 trophies"
+  (MetaResourceGained; the live data's key is ResourceData, 0x546b0c, and
+  0075's "Resource" left the hint without a resource) and "Use Prince to
+  Charge 3 enemies in a single match" (AbilityHitInOneGame: Unit,
+  AbilityMask with CountStartUp 4, HitsReqInOneGame; ours: a match of 3
+  rounds with the Prince in the deck counts, as a battle copies no group
+  quests). "Win N Trophies" is back in the daily pool. To test.
 - Open: 418 again, after 451's echo, so the road's rewards come apart
   from the star chest as in the original.
 

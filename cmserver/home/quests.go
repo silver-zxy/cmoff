@@ -237,6 +237,14 @@ func (a *Account) BattleRounds(mode, place, wonRounds, lost int32) {
 	if mode == ModeDuel && place == 1 && lost == 0 {
 		a.questProgress(questWinDuelPerfect, 1, nil)
 	}
+	// "Use Prince to Charge 3 enemies in a single match": the client counts
+	// the hits in battle, but a battle copies no group quests (0x4f6854),
+	// and the hook does not see the hits. Ours: the Prince charges once a
+	// round (prince_prebattle_rush, his start-up ability), so a match of 3
+	// rounds or more with him in the deck does it.
+	if wonRounds+lost >= 3 {
+		a.clashmasProgress(questAbilityHit, 1, nil)
+	}
 }
 
 // QuestsFromClient takes the progress the client counted itself (the hook
@@ -278,7 +286,7 @@ func (a *Account) QuestsFromClient(progress [][2]int32) (changed []string) {
 func (a *Account) questsTrophies(n int32) {
 	if n > 0 {
 		a.questProgress(questResourceGained, n, func(d questDef) bool {
-			return d.Own["Resource"] == resourceRankPointsKey
+			return d.Own["ResourceData"] == resourceRankPointsKey
 		})
 	}
 }
@@ -492,8 +500,31 @@ func (d questDef) encodeState(w *proto.Writer) {
 		// nothing in the short form (a Bool only in the other, 0x8f7258,
 		// 0x92fd04; 0x792064 none)
 	case questResourceGained:
-		// Resource: a resources reference, row + 1 (0x473414)
+		// ResourceData: a resources reference, row + 1 (0x473414). The live
+		// data's key is ResourceData (0x546b0c); 0075 sent "Resource", the
+		// client's quest had no resource and its hint crashed (0x834d64)
 		w.VInt(resourceRankPoints + 1)
+	case questAbilityHit:
+		// Unit (table 6, row + 1), AbilityMask, HitsReqInOneGame (state
+		// 0xea24a8: writer 0x960238, JSON 0x4708a0; the live data's bools
+		// CountAttack 1, CountSuper 2, CountStartUp 4, CountDeath 8,
+		// 0x80a300)
+		unit := int32(0)
+		if name, _ := d.Own["Unit"].(string); name != "" {
+			if row, ok := Data.CharRow(name); ok {
+				unit = row + 1
+			}
+		}
+		mask := int32(0)
+		for bit, k := range []string{"CountAttack", "CountSuper", "CountStartUp", "CountDeath"} {
+			if b, _ := d.Own[k].(bool); b {
+				mask |= 1 << bit
+			}
+		}
+		hits, _ := d.Own["HitsReqInOneGame"].(int)
+		w.VInt(unit)
+		w.VInt(mask)
+		w.VInt(int32(hits))
 	case questMetaUpgrade:
 		u, _ := d.Own["UnitUpgrades"].(bool)
 		h, _ := d.Own["HeroUpgrades"].(bool)

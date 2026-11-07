@@ -263,3 +263,58 @@ func TestSeasonEndRoadNextHome(t *testing.T) {
 		t.Fatalf("road chest %+v", a.Chests)
 	}
 }
+
+// "Win 10 trophies" and "Use Prince to Charge 3 enemies": open, in the
+// home, counted (trophies from ranked wins; the Prince by a match of 3
+// rounds with him in the deck).
+func TestClashmasTrophiesAndPrince(t *testing.T) {
+	apk := os.Getenv("CMSERVER_TEST_APK")
+	if apk == "" {
+		t.Skip("CMSERVER_TEST_APK not set")
+	}
+	d, err := LoadGameData(apk)
+	if err != nil {
+		t.Skip(err)
+	}
+	Data = d
+	defer func() { Data = nil }()
+	base := clashmasBase()
+	tro, prince := int32(-1), int32(-1)
+	for i, g := range base {
+		switch g.def.TypeID {
+		case questResourceGained:
+			tro = int32(i)
+		case questAbilityHit:
+			prince = int32(i)
+		}
+	}
+	if tro < 0 || prince < 0 {
+		t.Fatal("quests missing")
+	}
+	if _, ok := Data.CharRow("PrinceB1"); !ok {
+		t.Fatal("PrinceB1 not in table 6")
+	}
+	a := NewAccount()
+	a.StartProgression()
+	a.Clashmas = ClashmasState{Quests: []Quest{{ID: 900, Index: tro}, {ID: 901, Index: prince}}, Taken: []int32{tro, prince}}
+	h := a.ownHome()
+	h.home.skinStore = false
+	if _, err := decode(h.encode()); err != nil {
+		t.Fatal(err)
+	}
+	a.questsTrophies(10)
+	// the Prince in the deck
+	for i, r := range miniSeasonalRows {
+		if Data.CharName(miniCharRows[i]) == "PrinceB1" {
+			a.Decks[a.Selected][0] = r
+		}
+	}
+	a.BattleRounds(ModeDuel, 2, 1, 2)
+	if a.Clashmas.Quests[0].Progress != 10 || a.Clashmas.Quests[1].Progress != 1 {
+		t.Fatalf("%+v", a.Clashmas.Quests)
+	}
+	j := base[prince].def.json()
+	if j["HitsReqInOneGame"] != 3 || j["Unit"] != "PrinceB1" || base[tro].def.json()["ResourceData"] != "RankPoints" {
+		t.Fatalf("json %v", j)
+	}
+}

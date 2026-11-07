@@ -241,9 +241,12 @@ Fifth test: still the old quest again, without rewards. Two causes:
 - Kinds the server counts: PlayGameMode (duels, rumbles), PlayWithUnit (2,
   state: VInt RequirementMini, 0 none), WinWithUnit (1, state: Bool
   UseRoundWins, VInt RequirementMini; a duel won or a Rumble in the top 4), WinRumble, MetaResourceGained (25, state: VInt resource row + 1;
-  RankPoints, "Win N Trophies", ranked trophies won; out of the pool since
-  0075: a quest of that kind crashed the quest screen's hint, 0x834d64,
-  which found no resource), MetaSeasonRoadLevel.
+  RankPoints, "Win N Trophies", ranked trophies won; the live data's key
+  is ResourceData (0x546b0c): 0075 sent "Resource", the quest had no
+  resource and its hint crashed, 0x834d64; back in 0113),
+  MetaSeasonRoadLevel. AbilityHitInOneGame (23; live data 0x819044: Unit,
+  CountAttack / CountSuper / CountStartUp / CountDeath, HitsReqInOneGame;
+  state 0xea24a8: Unit row + 1, AbilityMask 1 / 2 / 4 / 8, hits).
   The data references are written by 0x37cc70: VInt row + 1, 0 for none.
 - The home reads its quests with flag 0 (0x4bce10 → 0x3b3af4): with the
   quest's tail (+0x30 …) and the states' short form. WinWithUnit's Bool

@@ -23,9 +23,8 @@ import (
 //
 // The quests are those of the screenshots; where a reward is not known
 // (a "Musketeer fragment", "1 fragment") the game's random-fragments quest
-// chest stands in. "Win 10 trophies" (MetaResourceGained) crashed the
-// quest screen (0075) and "Prince charges 3 enemies" (AbilityHitInOneGame)
-// has no known state; both are left out.
+// chest stands in. "Win 10 trophies" (MetaResourceGained) and "Prince
+// charges 3 enemies" (AbilityHitInOneGame) are in since 0113.
 //
 // The home holds the group's quests apart from the daily and chain ones
 // (quest manager +0xa0, decoder 0x4bd6d0) and per group its state (+0x60
@@ -83,6 +82,17 @@ func clashmasBase() []groupQuest {
 		{def: questDef{"WinWithUnit", questWinWithUnit, "TID_CHRONOS_QUESTS_WINWITHUNITSPECIFIC", 3,
 			coins(2), map[string]any{"UseRoundWins": false, "RequirementMini": "MusketeerB1"}}, mini: "MusketeerB1"},
 		rumbles(10, coins(3)),
+		// the two of the screenshots that were left out until 0113:
+		// "Win 10 trophies" (100 gold; its live data names the resource
+		// ResourceData, not Resource as 0075 did) and "Use Prince to
+		// Charge 3 enemies in a single match" (10 Crystal Coins, 10 gems)
+		{def: questDef{"MetaResourceGained", questResourceGained, "TID_CHRONOS_QUESTS_WINTROPHIES", 10,
+			[]int32{chestQuestGold100}, map[string]any{"ResourceData": resourceRankPointsKey}}},
+		{def: questDef{"AbilityHitInOneGame", questAbilityHit, "TID_CHRONOS_QUESTS_PRINCE_CHARGE", 1,
+			append(coins(2), chestSeasonGems10), map[string]any{
+				"Unit": "PrinceB1", "CountAttack": false, "CountSuper": false,
+				"CountStartUp": true, "CountDeath": false, "HitsReqInOneGame": 3,
+			}}, mini: "PrinceB1"},
 	}
 }
 
