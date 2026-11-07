@@ -14,8 +14,12 @@ import (
 // which the group was on: a few of its quests at a time, finishing 12
 // unlocked the Candy Elf skin (the milestone's chest), and after that the
 // group went on with Crystal Coins (screenshots: 12/12 with quests still
-// open). Our snapshot keeps Clashmas forever, so the group never ends; its
-// list starts over once every quest was handed out.
+// open). Our snapshot keeps Clashmas forever, so the group's clock never
+// runs out. Its list (0098): the known quests once, the fragment ones
+// first (they look like the first ones); then, as only 10 are known and
+// the Candy Elf needs 12, the first ones again until there are 12 (ours);
+// then the Crystal Coin ones once more, as the screenshots show them open
+// at 12/12 (the original list was longer than 12); then no more.
 //
 // The quests are those of the screenshots; where a reward is not known
 // (a "Musketeer fragment", "1 fragment") the game's random-fragments quest
@@ -38,12 +42,11 @@ const (
 	clashmasPick          = 3  // quests open at a time (PickLimit)
 	clashmasDoneReq int32 = 12 // for the Candy Elf
 	// chests.json
-	chestCandyElf    int32 = 127_000_264 // shop_skin_SpearGoblinElf
-	chestCoins5      int32 = 127_000_240 // shop_ChallengeCoin_5: 5 Crystal Coins
-	chestMonk25      int32 = 127_000_075 // shop_miniHero_Monk_25
-	chestMystery     int32 = 127_000_182 // quest_daily_Mystery: 1-3 random fragments
-	supportRowChamp  int32 = 17          // support_heroes: Royal Champion
-	clashmasCycleLen       = 3           // the list repeats this often in the event
+	chestCandyElf   int32 = 127_000_264 // shop_skin_SpearGoblinElf
+	chestCoins5     int32 = 127_000_240 // shop_ChallengeCoin_5: 5 Crystal Coins
+	chestMonk25     int32 = 127_000_075 // shop_miniHero_Monk_25
+	chestMystery    int32 = 127_000_182 // quest_daily_Mystery: 1-3 random fragments
+	supportRowChamp int32 = 17          // support_heroes: Royal Champion
 )
 
 // groupQuest is a group quest with the unit it needs in battle: a mini in
@@ -83,11 +86,18 @@ func clashmasBase() []groupQuest {
 	}
 }
 
-// clashmasQuests: the event's list, the base list a few times over.
+// clashmasQuests: the event's list: the known quests once, the first ones
+// again up to the Candy Elf's 12, then the Crystal Coin ones once more.
 func clashmasQuests() []groupQuest {
-	var out []groupQuest
-	for i := 0; i < clashmasCycleLen; i++ {
-		out = append(out, clashmasBase()...)
+	base := clashmasBase()
+	out := append([]groupQuest{}, base...)
+	for i := 0; len(out) < int(clashmasDoneReq); i++ {
+		out = append(out, base[i%len(base)])
+	}
+	for _, g := range base {
+		if g.def.Rewards[0] == chestCoins5 {
+			out = append(out, g)
+		}
 	}
 	return out
 }
@@ -129,8 +139,7 @@ func clashmasOn() bool { return Live && Data != nil }
 
 // refreshClashmas keeps three of the group's quests open: the claimed
 // ones go, the next ones are the lowest indices not yet handed out (as the
-// client picks with PickRandomly false); once all were handed out the list
-// starts over.
+// client picks with PickRandomly false); once all were handed out, no more.
 func (a *Account) refreshClashmas() {
 	if !clashmasOn() || !a.Progression {
 		return
@@ -146,15 +155,7 @@ func (a *Account) refreshClashmas() {
 	for len(a.Clashmas.Quests) < clashmasPick {
 		i := a.clashmasNext(len(list))
 		if i < 0 {
-			// all handed out: the list starts over (the open ones stay
-			// taken)
-			a.Clashmas.Taken = nil
-			for _, q := range a.Clashmas.Quests {
-				a.Clashmas.Taken = append(a.Clashmas.Taken, q.Index)
-			}
-			if i = a.clashmasNext(len(list)); i < 0 {
-				return
-			}
+			return // all handed out
 		}
 		a.QuestID++
 		a.Clashmas.Quests = append(a.Clashmas.Quests, Quest{ID: a.QuestID, Index: i})

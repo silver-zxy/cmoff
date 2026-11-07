@@ -48,7 +48,10 @@ the phone before the next.
 - Season end: the star exchange as in December 2021 (minis back to level
   1, rewards by stars); the choice of March 2022 is not in our client.
 - Mini quests only for newly unlocked minis, as in the original.
-- The Clashmas quests end after their list (each known quest once).
+- The Clashmas quests end after their list (0098): the known quests once,
+  the fragment ones first; the first ones again up to the Candy Elf's 12
+  (ours: only 10 are known); then the Crystal Coin ones once more, as the
+  screenshots show quests open at 12/12; then no more.
 - Mini Pass and the Clashmas Skins bundle stay free; no gem packs or
   other real-money offers.
 - The four older skins are everyone's (how they were sold is not known).
@@ -131,8 +134,9 @@ Still to do:
   event: in it the Clashmas quest group was on (QUEST_GROUP, event 3001),
   three of its quests at a time; 12 done unlock the Candy Elf (milestone,
   508), after that the group goes on with Crystal Coins. Our snapshot
-  keeps Clashmas forever: the group never ends (its clock always shows
-  about 14 days) and its list starts over once all were handed out.
+  keeps Clashmas forever: its clock always shows about 14 days; its list
+  ends (0098: the known ones, the first ones again up to 12, then the
+  Crystal Coin ones once more; the original list was longer than 12).
 
   | Quest (screenshots) | Reward |
   |---|---|

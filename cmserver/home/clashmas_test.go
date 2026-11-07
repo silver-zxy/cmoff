@@ -74,16 +74,22 @@ func TestClashmas(t *testing.T) {
 	if a.ClaimMilestone(&Reward{}, clashmasEvent, 0) == nil {
 		t.Fatal("milestone with 1 done")
 	}
+	// the list: the known quests, the first ones again up to 12, then the
+	// Crystal Coin ones; then it ends
 	list := clashmasQuests()
-	for k := 0; k < 2*len(list); k++ {
+	if len(list) <= int(clashmasDoneReq) || list[len(clashmasBase())].def.Kind != list[0].def.Kind ||
+		list[clashmasDoneReq].def.Rewards[0] != chestCoins5 || list[len(list)-1].def.Rewards[0] != chestCoins5 {
+		t.Fatalf("list of %d", len(list))
+	}
+	for len(a.Clashmas.Quests) > 0 {
 		q := &a.Clashmas.Quests[0]
 		q.Progress = list[q.Index].def.Target
 		if !a.ClaimQuest(&Reward{}, q.ID) {
-			t.Fatalf("claim %d %+v", k, a.Clashmas.Quests)
+			t.Fatalf("claim %+v", a.Clashmas.Quests)
 		}
-		if len(a.Clashmas.Quests) != clashmasPick {
-			t.Fatalf("after %d claims %+v", k, a.Clashmas)
-		}
+	}
+	if a.Clashmas.Done != int32(len(list)) {
+		t.Fatalf("done %d of %d", a.Clashmas.Done, len(list))
 	}
 	if err := a.ClaimMilestone(&Reward{}, clashmasEvent, 0); err != nil {
 		t.Fatal(err)
