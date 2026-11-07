@@ -237,6 +237,7 @@ func (s *Server) handle(c net.Conn) {
 			mode, ranked := apply(s.acc, cmds)
 			s.pushChests(c, sess)
 			s.pushNewMiniQuests(c, sess)
+			s.pushQuestUpdates(c, sess)
 			for _, cmd := range cmds {
 				if cmd.typ == cmdServerSeasonEnd {
 					s.releaseSeasonEnd(c, sess)
@@ -520,6 +521,28 @@ func (s *Server) releaseSeasonEnd(c net.Conn, sess *pepper.Session) {
 	}
 }
 
+// cmdServerUpdateQuestProgress is LogicUpdateQuestProgressCommand 351, a
+// server command (decoder 0x48deb4, execute 0x7249e4): quests whose
+// progress the server changed, shown at once (home.EncodeQuestUpdate).
+const cmdServerUpdateQuestProgress = 351
+
+// pushQuestUpdates sends 351 for the quests the server finished itself
+// (the tutorial's deck step).
+func (s *Server) pushQuestUpdates(c net.Conn, sess *pepper.Session) {
+	s.acc.Lock()
+	l := s.acc.TakeQuestUpdates()
+	if len(l) == 0 {
+		s.acc.Unlock()
+		return
+	}
+	w := proto.NewWriter()
+	w.VInt(cmdServerUpdateQuestProgress)
+	s.acc.EncodeQuestUpdate(w, l)
+	s.acc.Unlock()
+	log.Printf("-> quest progress (351): %d quest(s)", len(l))
+	s.send(c, sess, proto.AvailableServerCommand, w.Bytes())
+}
+
 // cmdServerSeasonEnd is LogicSeasonEndCommand 451, a server command
 // (decoder 0x4a96e0, execute 0x95918c): the client ends the season itself,
 // with the popup "Season has ended!" (home/seasonend.go).
@@ -612,7 +635,10 @@ const cmdServerUpdateChronosEvents = 417
 // after the 417: the season manager kept the freed season object, as
 // 0x7b5e50 links it to the new events only in offline mode. The hook now
 // calls 0x7b5e50 once more with the offline flag set after every 417
-// (cmoffline hook_chronos, 0112).
+// (cmoffline hook_chronos, 0111), and keeps the old and the command's
+// event collections from being freed: with the relink alone the client
+// crashed 4 s after a 417 (0117, an event's name read from freed memory
+// in onEventVisible). On again in 0118.
 func (s *Server) pushNewMiniQuests(c net.Conn, sess *pepper.Session) {
 	s.acc.Lock()
 	events, ok := s.acc.NewMiniQuests()

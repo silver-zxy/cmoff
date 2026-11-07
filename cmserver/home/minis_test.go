@@ -39,7 +39,12 @@ func TestMiniQuests(t *testing.T) {
 	if a.MiniQuests[0].Index != 0 || a.MiniQuests[1].Index != 1*3 || a.MiniQuests[2].Index != 3*3 {
 		t.Fatalf("order %+v", a.MiniQuests)
 	}
+	// counted by the client (the units played), reported by the hook
 	a.BattleResult(ModeDuel, 1, false)
+	if a.MiniQuests[0].Progress != 0 {
+		t.Fatalf("counted by the deck %+v", a.MiniQuests)
+	}
+	a.QuestsFromClient([][2]int32{{a.MiniQuests[0].ID, 1}})
 	if a.MiniQuests[0].Progress != 1 {
 		t.Fatalf("not counted %+v", a.MiniQuests)
 	}

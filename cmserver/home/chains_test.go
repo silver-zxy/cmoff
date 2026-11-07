@@ -3,6 +3,8 @@ package home
 import (
 	"os"
 	"testing"
+
+	"cmserver/proto"
 )
 
 // The tutorial chain for a new player, step by step; the competitive chain
@@ -41,21 +43,46 @@ func TestChains(t *testing.T) {
 	if found != 2 {
 		t.Fatalf("home chains %+v", lastChains)
 	}
-	// step 1: a deck change
-	a.Swap(a.Decks[a.Selected][1], 0, -1)
-	if !a.ClaimQuest(&Reward{}, tut.Quest.ID) || tut.Step != 1 {
-		t.Fatalf("step 1 %+v", *tut)
+	// step 1: done when the deck gets its mini, at once (351); a battle
+	// alone does not do it
+	a.questsAfterBattle(ModeDuel, 2)
+	if a.ClaimQuest(&Reward{}, tut.Quest.ID) {
+		t.Fatal("step 1 done without its mini")
 	}
-	// step 2: a match with the Wizard in the deck
-	row, _ := Data.CharRow("WizardB1")
+	name := tutorialSteps(a)[0].Own["RequirementMini"].(string)
+	row, _ := Data.CharRow(name)
 	for i, r := range miniCharRows {
 		if r == row {
-			a.Decks[a.Selected][0] = miniSeasonalRows[i]
+			a.Swap(miniSeasonalRows[i], 0, -1)
 		}
 	}
-	a.questsAfterBattle(ModeDuel, 2)
-	if !a.ClaimQuest(&Reward{}, tut.Quest.ID) || tut.Step != 2 {
-		t.Fatalf("step 2 %+v", *tut)
+	l := a.TakeQuestUpdates()
+	if len(l) != 1 || l[0].q.ID != tut.Quest.ID || tut.Quest.Progress != 1 {
+		t.Fatalf("351 %+v %+v", l, *tut)
+	}
+	w := proto.NewWriter()
+	a.EncodeQuestUpdate(w, l)
+	r := proto.NewReader(w.Bytes())
+	for i := 0; i < 5; i++ {
+		r.VInt()
+	}
+	if !r.Bool() || r.VInt() != 1 {
+		t.Fatal("351 head")
+	}
+	SkipQuest(r)
+	if r.Err() != nil || r.Remaining() != 0 {
+		t.Fatalf("351 quest %v", r.Err())
+	}
+	// step 2: a match using Wizard, counted by the client; the next step
+	// with the next id
+	for step := int32(1); step <= 2; step++ {
+		first := tut.Quest.ID
+		if step == 2 {
+			a.QuestsFromClient([][2]int32{{first, 1}})
+		}
+		if !a.ClaimQuest(&Reward{}, first) || tut.Step != step || tut.Quest.ID != a.QuestID || tut.Quest.ID == first {
+			t.Fatalf("step %d %+v", step, *tut)
+		}
 	}
 	// step 3: a hero upgrade (a mini's does not count)
 	a.questsUpgraded(miniID(0))
@@ -74,7 +101,7 @@ func TestChains(t *testing.T) {
 	a.BattleRounds(ModeDuel, 1, 3, 0)
 	a.BattleRounds(ModeDuel, 1, 2, 1)
 	id := comp.Quest.ID
-	if !a.ClaimQuest(&Reward{}, id) || comp.Done || comp.Quest.ID == id || comp.Step != 0 {
+	if !a.ClaimQuest(&Reward{}, id) || comp.Done || comp.Quest.ID != a.QuestID || comp.Step != 0 || comp.Quest.Progress != 0 {
 		t.Fatalf("competitive %+v", *comp)
 	}
 	// a finished chain's event goes

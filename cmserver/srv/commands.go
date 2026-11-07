@@ -99,6 +99,8 @@ func (c command) String() string {
 		return fmt.Sprintf("LogicClaimRewardCommand (ours, echoed) chest #%d", c.args[0])
 	case cmdServerSeasonEnd:
 		return fmt.Sprintf("LogicSeasonEndCommand (ours, echoed) season %d", c.args[0])
+	case cmdServerUpdateQuestProgress:
+		return "LogicUpdateQuestProgressCommand (ours, echoed)"
 	}
 	if l, ok := skipLayouts[c.typ]; ok {
 		return fmt.Sprintf("%s %v", l.name, c.args)
@@ -209,6 +211,15 @@ func parseEndClientTurn(p []byte) (cmds []command, err error) {
 					}
 					r.VInt()
 					r.Bool()
+				}
+			}
+		case cmdServerUpdateQuestProgress:
+			// our 351 echoed: the bases, a bool, the quests
+			r.VInt()
+			base(r)
+			if r.Bool() {
+				for n := r.VInt(); n > 0 && r.Err() == nil; n-- {
+					home.SkipQuest(r)
 				}
 			}
 		case cmdServerSeasonEnd:

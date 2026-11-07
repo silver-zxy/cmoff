@@ -297,7 +297,38 @@ Still to do:
   MINI QUESTS), the competitive chain ("Win 5 rounds in Duel or Rumble",
   1 Crystal Coin, again and again; its own section) and "Use 100 Crystal
   Coins" in the daily pool (home/chains.go). Ours: the tutorial chain's
-  rewards and who gets it, the amounts. To test.
+  rewards and who gets it, the amounts. Tested: the competitive chain and
+  the Clashmas quests work.
+- 0116: a chain's next step keeps the quest's id, as the client does (the
+  hero upgrade step could not be claimed: the client claimed id 18, the
+  server had given it 19; it came back with the next home). Mini quests
+  the same. The deck step counts any change of the deck, as the client
+  does (MetaChangeDeck has no unit); its text now names a mini the player
+  has. To test.
+- 0117: mini quests at once dropped again: even with the hook's relink
+  the client crashed 4 s after the 417. 0118: on again; the hook keeps the
+  old and the command's events from being freed (docs/LIVE_CONTENT.md).
+  On the phone: no crash; but quests with ids the server did not know
+  (claiming one left a chest without content and the home stuck), mini
+  quests done for minis not played, the deck step done with any mini.
+- 0119: the quest manager's +0xb0 is the id the client gives its next
+  quest (0x605da0, 0x84fba0: the quest gets +0xb0, then +0xb0 + 1); we
+  sent the last id, so every quest the client handed out itself had the
+  id of the server's last one (also 0116's "no finished quest", wrongly
+  read as "the client keeps the id"; 0116 undone). Now the last id + 1.
+  Unit quests (mini quests, the tutorial's units) only the client counts
+  (the hook reports them); the server counted by the deck. The tutorial's
+  step 1 is a match using Magic Archer or Shield Skeleton (PlayWithUnit,
+  with the same text): MetaChangeDeck counts any change. Tested: works,
+  but the deck step needed a match.
+- 0120: the deck step is done at once when the deck gets its mini: the
+  server marks it and tells the client with LogicUpdateQuestProgressCommand
+  351 (base, Bool, VInt count, the quests as in the home; execute
+  0x7249e4 -> 0x750b9c updateQuest by id). Offline mode done after this
+  (7 November 2026). Next: the shop's gold and gems at its end, then the
+  Mini Room. The deck step counts any deck change also
+  in the original (its tooltip: "Modify your deck to complete this
+  Quest"; the tutorial's deck builder guides the player to the new mini).
 - Open: 418 again, after 451's echo, so the road's rewards come apart
   from the star chest as in the original.
 

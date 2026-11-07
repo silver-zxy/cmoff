@@ -43,7 +43,7 @@ Types (0x4ccac0): `SHOP_LAYOUT`, `QUEST_POOL`, `QUEST_CHAIN`,
 
 | Id | Name | Side |
 |---|---|---|
-| 351 | LogicUpdateQuestProgressCommand | server → client: the server counts quest progress |
+| 351 | LogicUpdateQuestProgressCommand | server → client: quests the server changed (0120: base, Bool, VInt count, quests as in the home) |
 | 502 | LogicRerollQuestCommand | client |
 | 503 | LogicClaimQuestRewardCommand | client (reward = a chest, filled with 420) |
 | 508 | LogicClaimQuestMilestoneCommand | client |
@@ -106,7 +106,8 @@ them out.
   content (420).
 - The server counts progress: battles (PlayGameMode, WinRumble), upgrades
   incl. the client's auto-upgrades (MetaUpgrade); it shows with the next
-  home. LogicUpdateQuestProgressCommand 351 is not sent yet.
+  home. LogicUpdateQuestProgressCommand 351 shows a change at once
+  (0120: the tutorial's deck step).
 
 Third test: the quests counted, but neither claim (503) nor reroll (502)
 reached the server. The quest manager's bool +0xc8 (0x5c53dc) is the quest
@@ -404,4 +405,13 @@ Fifth test: still the old quest again, without rewards. Two causes:
   and hands out the new chains' quests. The server sends 417 again when a
   mini is unlocked. The slot is patched once the home is reached (game
   state 4, 0114). The start-up crash that 0114 was made for came from the
-  help page instead (0115).
+  help page instead (0115). Off again (0117): with the relink the client
+  still crashed about 4 s after the 417 (in 0x5a3e28's memcpy, from
+  0x8ce9a4 -> 0x467e78 -> 0x3abbf0 -> 0x90dccc -> 0x59a318 -> 0x616e44 ->
+  0x721e98 -> 0x296ca0, "[LIVE EVENT] onEventVisible": an event's name
+  read from freed memory): more holds on to the events than the season
+  manager. 0118: the hook also keeps both collections from being freed
+  (the events manager's old one, home+0x140 +0x10, taken out before the
+  command; the command's own, +0x20, after it, freed by its destructor
+  0x4ea4ac otherwise; its encoder 0x3bf12c writes "no events" then), and
+  the server sends 417 again on a new mini.

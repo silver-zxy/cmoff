@@ -182,7 +182,7 @@ func (a *Account) claimMiniQuest(r *Reward, id int32) bool {
 			}
 		}
 		// the chain's next step right away, with the next quest id, as
-		// the client hands it out after the claim
+		// the client hands it out after the claim (0x605da0)
 		if _, step := miniOfQuest(*q); int(step)+1 < len(miniQuestWins) {
 			a.QuestID++
 			a.MiniQuests = append(a.MiniQuests, Quest{ID: a.QuestID, Index: q.Index + 1})

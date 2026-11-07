@@ -68,8 +68,10 @@ type Account struct {
 	// WithheldExp: upgrade exp held back for the next level chests
 	// (pushUpgradeExp)
 	WithheldExp int32 `json:"withheld_exp,omitempty"`
-	// Chains: the tutorial and competitive quest chains (chains.go)
-	Chains []ChainState `json:"chains,omitempty"`
+	// Chains: the tutorial and competitive quest chains (chains.go);
+	// questUpdates: quests to show the client now (351, chains.go)
+	Chains       []ChainState `json:"chains,omitempty"`
+	questUpdates []chainQuest
 	// LevelChests: player levels whose level chest was given.
 	LevelChests []int32 `json:"level_chests,omitempty"`
 	// Daily quests (quests.go): today's, the day, the last quest id.
@@ -315,6 +317,8 @@ func (a *Account) ownHome() ownHomeData {
 		a.refreshMiniQuests()
 		a.refreshClashmas()
 		a.refreshChains()
+		a.deckChanged() // the deck step done if the deck has its mini already
+		a.questUpdates = nil
 	}
 	h.events = a.events()
 	if Live {
@@ -402,6 +406,7 @@ func (a *Account) Swap(mini, slot, slot2 int32) {
 		d[slot] = -1
 	}
 	a.questProgress(questMetaChangeDeck, 1, nil)
+	a.deckChanged()
 }
 
 // AddTroop: LogicAddTroopToDeckCommand 595 (global mini id, add or remove).
@@ -416,6 +421,7 @@ func (a *Account) AddTroop(global int32, add bool) {
 				d[j] = -1
 			}
 			a.questProgress(questMetaChangeDeck, 1, nil)
+			a.deckChanged()
 			return
 		}
 	}

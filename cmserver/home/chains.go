@@ -3,6 +3,7 @@ package home
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"cmserver/proto"
@@ -49,8 +50,7 @@ type ChainState struct {
 	Step  int32 `json:"step"`
 	Quest Quest `json:"quest"`
 	Done  bool  `json:"done,omitempty"`
-	// Variant: the tutorial chain's first step, Magic Archer (1) or
-	// Shield Skeleton (0), picked at its start
+	// Variant: unused since 0116 (the first step's mini is picked anew)
 	Variant int32 `json:"variant,omitempty"`
 }
 
@@ -63,16 +63,106 @@ type chainDef struct {
 	steps    func(a *Account) []questDef
 }
 
+// tutorialDeckStep: step 1's text prefix (both minis).
+const tutorialDeckStep = "TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_1_"
+
+// deckChanged: the deck changed (500, 595). Step 1 of the tutorial chain
+// ("Modify your deck to include ...") is done once the deck has its mini;
+// the client does not count it (a PlayWithUnit, counted in battle), so the
+// server tells it at once with LogicUpdateQuestProgressCommand 351
+// (TakeQuestUpdates). The caller holds the lock.
+func (a *Account) deckChanged() {
+	for _, o := range a.openChains() {
+		d := o.step
+		if !strings.HasPrefix(d.Text, tutorialDeckStep) || o.s.Quest.Progress >= d.Target {
+			continue
+		}
+		name, _ := d.Own["RequirementMini"].(string)
+		if row, ok := Data.CharRow(name); ok && a.deckHasChar(row) {
+			o.s.Quest.Progress = d.Target
+			a.questUpdates = append(a.questUpdates, chainQuest{o.c.event, o.s.Step, o.c.catID, o.s.Quest, d})
+		}
+	}
+}
+
+// TakeQuestUpdates: the quests whose progress the server changed for the
+// client to see now (351), once. The caller holds the lock.
+func (a *Account) TakeQuestUpdates() []chainQuest {
+	l := a.questUpdates
+	a.questUpdates = nil
+	return l
+}
+
+// EncodeQuestUpdate writes LogicUpdateQuestProgressCommand 351 (decoder
+// 0x48deb4: the server command base, Bool, VInt count and the quests as
+// the home has them, 0x3a0e0c -> 0x3b3af4; execute 0x7249e4 ->
+// 0x750b9c "LogicQuestManager::updateQuest": the quest by its id takes
+// the new one, the screen shows the progress, a quest done is done).
+func (a *Account) EncodeQuestUpdate(w *proto.Writer, l []chainQuest) {
+	w.VInt(0) // server command base
+	w.VInt(-1)
+	w.VInt(0)
+	w.VInt(1)
+	w.VInt(0) // LogicCommand base
+	w.Bool(true)
+	w.VInt(int32(len(l)))
+	end := questsEnd(a.dailyGold())
+	for _, c := range l {
+		writeQuest(w, c.q, c.def, c.event, c.step, c.category, end)
+	}
+}
+
+// SkipQuest reads past a quest as writeQuest writes it (for 351's echo).
+func SkipQuest(r *proto.Reader) {
+	r.VInt()
+	r.VInt()
+	kind := r.VInt()
+	if r.Bool() {
+		switch kind {
+		case questMetaUpgrade:
+			r.Bool()
+			r.Bool()
+		case questWinWithUnit:
+			r.Bool()
+			r.VInt()
+		case questAbilityHit:
+			r.VInt()
+			r.VInt()
+			r.VInt()
+		case questPlayGameMode, questPlayWithUnit, questResourceGained,
+			questUpgradeUnit, questTotalKOs, questKeywordClash, questEndRoundAlive:
+			r.VInt()
+		}
+	}
+	_ = r.String()
+	for i := 0; i < 5; i++ {
+		r.VInt()
+	}
+	for n := r.VInt(); n > 0 && r.Err() == nil; n-- {
+		r.VInt()
+	}
+	_ = r.String()
+	r.VInt()
+	r.VInt()
+}
+
 func tutorialSteps(a *Account) []questDef {
-	// Magic Archer if the player has it and it is not in the deck, else
-	// Shield Skeleton (the two texts of step 1)
-	text := "TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_1_SHIELDSKELETONSWAP"
-	if s := a.chain(tutorialChainEvent); s != nil && s.Variant == 1 {
-		text = "TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_1_MAGICARCHERSWAP"
+	// Step 1, "Modify your deck to include Magic Archer / Shield
+	// Skeleton": as MetaChangeDeck the client counted any change of the
+	// deck (the kind has no unit), so it is a PlayWithUnit of that mini,
+	// which the client counts only in battle; the server marks it done
+	// once the deck has the mini and tells the client at once (351,
+	// deckChanged; 0120). The mini: Magic Archer if the player has it, else
+	// Shield Skeleton if the player has that, else Magic Archer.
+	mini, text := "EliteArcherB1", "TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_1_MAGICARCHERSWAP"
+	archer, okA := Data.CharRow("EliteArcherB1")
+	skel, okS := Data.CharRow("ShieldSkeletonB1")
+	if !(okA && a.ownsChar(archer)) && okS && a.ownsChar(skel) {
+		mini, text = "ShieldSkeletonB1", "TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_1_SHIELDSKELETONSWAP"
 	}
 	r := []int32{chestMystery}
 	return []questDef{
-		{"MetaChangeDeck", questMetaChangeDeck, text, 1, r, map[string]any{}},
+		{"PlayWithUnit", questPlayWithUnit, text, 1, r, map[string]any{"RequirementMini": mini}},
 		{"PlayWithUnit", questPlayWithUnit, "TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_2", 1, r,
 			map[string]any{"RequirementMini": "WizardB1"}},
 		{"MetaUpgrade", questMetaUpgrade, "TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_3", 1, r,
@@ -152,9 +242,6 @@ func (a *Account) refreshChains() {
 			continue
 		}
 		s := ChainState{Event: c.event}
-		if row, ok := Data.CharRow("EliteArcherB1"); ok && c.event == tutorialChainEvent && a.ownsChar(row) && !a.deckHasChar(row) {
-			s.Variant = 1
-		}
 		a.QuestID++
 		s.Quest = Quest{ID: a.QuestID}
 		a.Chains = append(a.Chains, s)
@@ -199,11 +286,11 @@ func (a *Account) chainsProgress(kind, n int32, match func(questDef) bool) {
 		if d.TypeID != kind || o.s.Quest.Progress >= d.Target || (match != nil && !match(d)) {
 			continue
 		}
+		// a unit quest only the client can count: it knows which units
+		// were played (the hook reports it, QuestsFromClient); by the deck
+		// the server counted minis that were not used (0118)
 		if name, _ := d.Own["RequirementMini"].(string); name != "" {
-			row, ok := Data.CharRow(name)
-			if !ok || !a.deckHasChar(row) {
-				continue
-			}
+			continue
 		}
 		o.s.Quest.Progress = min(o.s.Quest.Progress+n, d.Target)
 	}
@@ -246,6 +333,8 @@ func (a *Account) claimChainQuest(r *Reward, id int32) bool {
 				s.Done = true
 			}
 		}
+		// the next step with the next quest id, as the client hands it out
+		// (0x605da0: the id is the manager's +0xb0, then +0xb0 + 1)
 		if !s.Done {
 			a.QuestID++
 			s.Quest = Quest{ID: a.QuestID}

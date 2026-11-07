@@ -226,9 +226,9 @@ func (a *Account) questsAfterBattle(mode, place int32) {
 			return !r // rounds: the client counts them
 		})
 	}
-	if won(mode, place) {
-		a.miniQuestsWon()
-	}
+	// the mini quests' wins the client counts (it knows the units played;
+	// QuestsFromClient): by the deck the server counted minis that were
+	// not played (0118)
 	if mode == ModeRumble && place == 1 { // "Finish as the Champion"
 		a.questProgress(questWinRumble, 1, nil)
 	}
@@ -370,8 +370,19 @@ func encodeQuests(w *proto.Writer, s questState, d dailyGold) {
 			done++
 		}
 	}
-	w.Bool(Live)        // +0xc8: quests on; off, 502/503/508/351 fail with 3 (0x5c53dc)
-	w.VInt(s.lastID)    // +0xb0: the last quest id (the client counts on)
+	w.Bool(Live) // +0xc8: quests on; off, 502/503/508/351 fail with 3 (0x5c53dc)
+	// +0xb0: the id the client gives its next quest (0x605da0, 0x84fba0:
+	// the quest gets +0xb0, then +0xb0 + 1), so the last one + 1. With the
+	// last one (until 0119) every quest the client handed out itself (a
+	// chain's next step, a new chain after 417) had the id of the
+	// server's last quest: claims of unknown ids ("no finished quest",
+	// 0116), two quests with one id, a chest without content and a
+	// stuck home (0118). Quests off: 0, as .gnoks's home has it.
+	if Live {
+		w.VInt(s.lastID + 1)
+	} else {
+		w.VInt(s.lastID)
+	}
 	w.VInt(s.rerolls)   // +0xb4: daily rerolls used (0x4974c4)
 	w.VInt(done)        // +0xe4: daily quests done ("Quests completed", 0x90d7c0)
 	w.VInt(0)           // +0xb8: weekly rerolls used

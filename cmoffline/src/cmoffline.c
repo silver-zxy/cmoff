@@ -922,10 +922,29 @@ static void watch_tutorial(uint8_t *gm, int state) {
 #define LIBG_EVENTS_RELINK   0x6b5e50   /* Ghidra 0x7b5e50 */
 #define MODE_HOME            0x48       /* 0x8223c4 */
 #define MODE_AVATAR          0x50       /* 0x4eea2c */
+/* The events: home+0x140 the events manager (0x51e094), its +0x10 the
+ * collection (0x6b7fe0 frees the old one, then takes the new); the
+ * command's own collection is +0x20, freed with the command (0x4ea4ac).
+ * With only the season manager linked anew the client still crashed 4 s
+ * after a 417 (0117: in "[LIVE EVENT] onEventVisible", 0x296ca0, copying
+ * an event's name from freed memory): more holds on to those events. So
+ * neither collection is freed: the old one is taken out before the
+ * command runs, the command's own after it (its encoder writes "no
+ * events" then, 0x3bf12c). A few kilobytes per new mini, kept. */
+#define HOME_EVENTS          0x140
+#define EVENTS_COLLECTION    0x10
+#define CHRONOS_CMD_EVENTS   0x20
 static int (*real_chronos_execute)(void *cmd, void *mode);
 static int cm_chronos_execute(void *cmd, void *mode) {
-    int r = real_chronos_execute(cmd, mode);
     void *home = peek_ptr(mode, MODE_HOME), *avatar = peek_ptr(mode, MODE_AVATAR);
+    uint8_t *events = home ? peek_ptr(home, HOME_EVENTS) : NULL;
+    void *old = events ? *(void **)(events + EVENTS_COLLECTION) : NULL;
+    if (old) *(void **)(events + EVENTS_COLLECTION) = NULL; /* not freed */
+    int r = real_chronos_execute(cmd, mode);
+    if (events && !*(void **)(events + EVENTS_COLLECTION))
+        *(void **)(events + EVENTS_COLLECTION) = old; /* nothing new taken */
+    else if (cmd)
+        *(void **)((uint8_t *)cmd + CHRONOS_CMD_EVENTS) = NULL; /* not freed */
     if (r == 0 && home && avatar) {
         volatile uint8_t *offline = G(LIBG_OFFLINE_FLAG);
         uint8_t was = *offline;
