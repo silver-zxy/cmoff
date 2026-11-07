@@ -162,7 +162,8 @@ Still to do:
   every day's shop; the server refuses to sell it again.
 - The older skins (Celtic Magic Archer, Scientist Electro Wizard,
   Gravedigger Miner, Victory Shield Maiden) were not on sale in December
-  2021: they stay locked unless we learn more (B8).
+  2021 (shop chests, so sold before, how is not known): decided, everyone
+  owns them (0095).
 - The Crystal P.E.K.K.A was missing from our skin list (it was locked
   even in the unlocked collection); added (0088).
 
@@ -220,9 +221,6 @@ videos, r/ClashMini), the wiki's Mini Pass page as text.
   gold.
 - ~~B6. Crystal Prince skin~~: its chest (shop_skin_PrinceCrystal) gives
   the Fabulous skin (44000089); there is no Crystal Prince skin.
-- **B8. Older skins**: how Celtic Magic Archer, Scientist Electro Wizard,
-  Gravedigger Miner and Victory Shield Maiden were unlocked before
-  December 2021 (shop? season 0?).
 - **B7. Clashmas Skins bundle**: "+160% extra" hints at more than the
   three skins (gems, gold?).
 
