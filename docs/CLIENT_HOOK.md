@@ -204,6 +204,7 @@ logged with `pc`, `lr` and the frame chain as Ghidra addresses, then passed on.
 |---|---|
 | GOT getaddrinfo / read / recvfrom / write / sendto / connect / close | libg+0xdf4fc8 / 0xdf4c08 / 0xdf43e8 / 0xdf6d18 / 0xdf4bf0 / 0xdf55a8 / 0xdf49a8 |
 | offline flag | libg+0x108abd8 (Ghidra 0x118abd8) |
+| 417 execute (vtable slot, hooked) / events relink | libg+0xd98088 -> 0x582b80 / 0x6b5e50 |
 | GameMain* | libg+0x1078728 |
 | LogicGlobals* | libg+0x1080760 |
 | game state / game mode | GameMain+0x28 / GameMain+0x20 |

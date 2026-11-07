@@ -236,6 +236,7 @@ func (s *Server) handle(c net.Conn) {
 			}
 			mode, ranked := apply(s.acc, cmds)
 			s.pushChests(c, sess)
+			s.pushNewMiniQuests(c, sess)
 			for _, cmd := range cmds {
 				if cmd.typ == cmdServerSeasonEnd {
 					s.releaseSeasonEnd(c, sess)
@@ -607,12 +608,11 @@ const cmdServerUpdateChronosEvents = 417
 
 // pushNewMiniQuests: a mini unlocked during the session gets its mini
 // quests at once: the account's events again with 417, the client starts
-// the new chain itself (home.NewMiniQuests). Not used: 0099 crashed the
-// client 0.8 s after the 417, while it opened a chest that unlocked minis
-// (0x529788 filling the chains -> 0x59c30c -> 0x4d2404 -> the season
-// manager 0x932d98 read a freed season object: 417 replaces the events,
-// and the season manager is linked to the new ones only when the flag at
-// 0x118abd8 is set, 0x7b5e50 / 0x3b4300).
+// the new chain itself (home.NewMiniQuests). 0099 crashed the client 0.8 s
+// after the 417: the season manager kept the freed season object, as
+// 0x7b5e50 links it to the new events only in offline mode. The hook now
+// calls 0x7b5e50 once more with the offline flag set after every 417
+// (cmoffline hook_chronos, 0112).
 func (s *Server) pushNewMiniQuests(c net.Conn, sess *pepper.Session) {
 	s.acc.Lock()
 	events, ok := s.acc.NewMiniQuests()

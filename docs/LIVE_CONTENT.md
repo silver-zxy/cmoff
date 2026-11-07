@@ -394,3 +394,12 @@ Fifth test: still the old quest again, without rewards. Two causes:
   (home +0x1c8, 0x932d98) read its season object, freed with the old
   events. 0x7b5e50 links the season manager to the new events (0x4caa6c)
   only when the flag 0x118abd8 (0x3b4300) is set. Off again (0100).
+- 0112: the hook replaces 417's execute in its vtable (Ghidra 0xe98070
+  +0x18): after the original it calls 0x7b5e50(home, avatar) once more
+  with the offline flag set for that call (the flag inside 0x682b80 would
+  also change 0x6b7fe0). That links the season manager to the new events
+  and hands out the new chains' quests. The server sends 417 again when a
+  mini is unlocked. Patched at the hook's start, the client crashed while
+  starting (0x60a330 -> 0x3e4eb0, an obfuscated jump into nowhere: likely
+  a check of its vtables); from 0114 the slot is patched once the home is
+  reached (game state 4).

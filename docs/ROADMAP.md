@@ -58,8 +58,7 @@ the phone before the next.
 
 ## Next (from 7 November 2026, in this order)
 
-1. Season end: the road's rewards with 418 again (after 451's echo, as
-   the star chest's 420), apart from the star chest as in the original.
+1. ~~Season end: the road's rewards with 418~~ (0111 dropped, not a goal).
 2. Mini quests at once on unlock without 417 (it crashed, 0099): find
    how the original handed them out mid-session.
 3. The two missing Clashmas quests: "Prince charges 3 enemies"
@@ -280,6 +279,12 @@ Still to do:
   fragments too (0x48aaa0), the server kept them and upgraded once more.
   0109: the fragments go on the server as well (tested 7 November 2026:
   star chest, several level-ups, no hang).
+- 0111 (418 for the road's rewards, apart from the star chest) did not
+  work on the phone and was dropped (decided: not a goal); the road's
+  rewards stay in the star chest.
+- 0112: mini quests at once on unlock again: 417, and the hook links the
+  season manager to the new events after it (docs/LIVE_CONTENT.md). To
+  test.
 - Open: 418 again, after 451's echo, so the road's rewards come apart
   from the star chest as in the original.
 

@@ -907,6 +907,52 @@ static void watch_tutorial(uint8_t *gm, int state) {
     *offline = 1; /* until the battle starts */
 }
 
+/* LogicUpdateChronosEventsCommand 417 (execute 0x682b80, vtable Ghidra
+ * 0xe98070 slot +0x18) replaces the events; then 0x7b5e50(home, avatar)
+ * links the season manager (home+0x1c8) to the new events and hands out
+ * the quests of new events (a new mini's chain) - but only with the
+ * offline flag set (0x3b4300). Online it returns at once, the season
+ * manager keeps the freed season object, and the client crashed (0099).
+ * So after the command ran, call 0x7b5e50 once more with the flag set
+ * for that call only (inside 0x682b80 the flag also changes 0x6b7fe0,
+ * which is left alone). The server sends 417 when a mini is unlocked. */
+#define LIBG_CHRONOS_VTABLE  0xd98070   /* Ghidra 0xe98070 */
+#define CHRONOS_VT_EXECUTE   0x18
+#define LIBG_CHRONOS_EXECUTE 0x582b80   /* Ghidra 0x682b80 */
+#define LIBG_EVENTS_RELINK   0x6b5e50   /* Ghidra 0x7b5e50 */
+#define MODE_HOME            0x48       /* 0x8223c4 */
+#define MODE_AVATAR          0x50       /* 0x4eea2c */
+static int (*real_chronos_execute)(void *cmd, void *mode);
+static int cm_chronos_execute(void *cmd, void *mode) {
+    int r = real_chronos_execute(cmd, mode);
+    void *home = peek_ptr(mode, MODE_HOME), *avatar = peek_ptr(mode, MODE_AVATAR);
+    if (r == 0 && home && avatar) {
+        volatile uint8_t *offline = G(LIBG_OFFLINE_FLAG);
+        uint8_t was = *offline;
+        *offline = 1;
+        ((void (*)(void *, void *))G(LIBG_EVENTS_RELINK))(home, avatar);
+        *offline = was;
+        LOG("events update (417): season manager linked to the new events, new quests handed out");
+    } else {
+        LOG("events update (417): result %d, not linked", r);
+    }
+    return r;
+}
+
+static void hook_chronos(void) {
+    void **slot = (void **)G(LIBG_CHRONOS_VTABLE + CHRONOS_VT_EXECUTE);
+    if (*slot != G(LIBG_CHRONOS_EXECUTE)) {
+        LOG("417 vtable slot %p unexpected, events update not hooked", *slot);
+        return;
+    }
+    real_chronos_execute = (int (*)(void *, void *))*slot;
+    if (patch_pointer(slot, (void *)cm_chronos_execute)) {
+        LOG("417 vtable: mprotect failed");
+        return;
+    }
+    LOG("events update (417) hooked");
+}
+
 static void battles_main(void) {
     int bad = 0;
     bad |= hook_got(LIBG_GOT_READ,     "read",     (void *)cm_read,     (void **)&real_read);
@@ -939,6 +985,14 @@ static void battles_main(void) {
         if (state != last_state) {
             LOG("game state %d -> %d (offline flag %d)", last_state, state, *offline);
             last_state = state;
+            /* not at load: the client crashed during its start-up
+             * (0x60a330 -> 0x3e4eb0 jumped into nowhere) with the vtable
+             * patched that early; in the home it is past that */
+            static int chronos_hooked;
+            if (state == 4 && !chronos_hooked) {
+                chronos_hooked = 1;
+                hook_chronos();
+            }
         }
         watch_result(gm, state);
         {
