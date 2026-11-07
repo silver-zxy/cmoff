@@ -1,5 +1,7 @@
 package home
 
+import "fmt"
+
 // Dev mode (build option DEV=on, server option dev=on / -dev): an account
 // of its own (accounts-dev.json, so the real one stays as it is) with
 // everything at hand to test: every currency at its top, the Adventure
@@ -63,9 +65,14 @@ func AccountFile(dev bool) string {
 const devTrophies int32 = 950
 
 // DevStart: dev mode at the server's start: the trophies to Diamond 1,
-// then the season ends.
+// then the season ends; not while chests with a popup wait in the home or
+// a season's end is still to come (they piled up, 0101).
 func (a *Account) DevStart() string {
 	a.Lock()
+	if n := a.popupChests(); n > 0 || a.SeasonEndDue {
+		a.Unlock()
+		return fmt.Sprintf("no season end: %d chests to open first, 451 due %v", n, a.SeasonEndDue)
+	}
 	if a.Progression {
 		a.Trophies = max(a.Trophies, devTrophies)
 		if a.BestTrophies < a.Trophies {

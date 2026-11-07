@@ -56,6 +56,21 @@ the phone before the next.
   other real-money offers.
 - The four older skins are everyone's (how they were sold is not known).
 
+## Next (from 7 November 2026, in this order)
+
+1. Season end: the road's rewards with 418 again (after 451's echo, as
+   the star chest's 420), apart from the star chest as in the original.
+2. Mini quests at once on unlock without 417 (it crashed, 0099): find
+   how the original handed them out mid-session.
+3. The two missing Clashmas quests: "Prince charges 3 enemies"
+   (AbilityHitInOneGame, its state) and "Win 10 trophies"
+   (MetaResourceGained crashed the quest screen, 0075).
+4. Quests found in the client: the tutorial chain, the competitive chain
+   (quest_Competitive_5W), "Use N Crystal Coins".
+5. Part B research (B1 road per tier, B2 Clashmas quests, B3 mini quest
+   rewards, B5 daily quests, B7 the skins bundle).
+6. A10 Mini Room / PvP (largest).
+
 ## Part A: what we know
 
 ### A0. Boards by league (0071, 0072; tested)
@@ -194,11 +209,11 @@ Still to do:
   (P.L.U.S.H. P.E.K.K.A at tier 26, Luchador Monk at 87, wiki), 200 gems,
   2000 gold.
 
-### A8. Season end (every two months) (0096, to test)
+### A8. Season end (every two months) (0096-0109; tested)
 
 - When the season key changes (dev mode: at every start):
-  - the road's tiers reached and not claimed come as a chest (both lanes;
-    418 in the original);
+  - the road's tiers reached and not claimed come in the star chest (both
+    lanes; 418 in the original, see below);
   - the star exchange as in December 2021 (decided: the choice of March
     2022 has no screen in our client): every mini back to level 1, for 6
     or more stars the tier's chests of season_rewards.csv (the three
@@ -215,12 +230,58 @@ Still to do:
 - Tested (7 November 2026): minis back to level 1, the road and star
   chests. Dev mode sets the trophies to 950 before its season end, to see
   the reset (0099).
-- Still to do: the popup "Season has ended!" / "Total Mini Stars"
-  (LogicSeasonEndCommand 451: VInt, Int new season, Int, Long, Long, the
-  server command base; execute 0x95918c -> 0x48a4dc, where the client
-  makes the exchange itself: stars from the collectible levels, the
-  chests by stars as one chest of source 9, the trophy reset, the road;
-  the server then must not give them a second time).
+- The popup "Season has ended!" / "Total Mini Stars" (0101): as in the
+  original the client does the exchange with LogicSeasonEndCommand 451
+  (VInt, Int new season, Int its event, Long, Long, the server command
+  base; execute 0x95918c -> 0x48a4dc). It runs only while the avatar's
+  season key (+0x44, was always 0) is lower than the new one; then the
+  client counts the stars (characters.csv ModifierLevel 2/3/4 reached),
+  makes one chest of the season_rewards.csv tier (source 9), sets the
+  minis to level 1, resets the trophies and shows the popup. The server
+  claims the road at the change (the chest is in the home), sends the
+  home with the old key, levels and trophies, then 451, does the same as
+  the client and pushes the star chest's content (420). Unknown: the two
+  Longs (0 sent).
+- 0101 on the phone: 451 ran (the client echoes it), but right after a
+  home with 13 chests: the trophy reset's league screen and the chests'
+  popups ran into each other, the home got stuck and the minis were not
+  drawn until the screen was left. The dev account had piled up chests
+  (a 90-tier road chest with every dev start). 0102: 451 waits until no
+  chest is left in the home (the road's chest first), and dev mode ends
+  the season only with no chest waiting.
+- 0102: the road's chest came before the popup. 0103 tried the
+  original's LogicClaimSeasonRoadRewardsOnSeasonEndCommand 418 (VInt list,
+  VInt season, VInt source 5, VInt season, Bool + content; execute
+  0x53338c, the ended season as a second road manager entry): popup, then
+  nothing. 0104: the road's tiers into the star chest instead (under 6
+  stars: a chest with the next home): the chest stayed empty, as the 420
+  sent with 451 right after the home was never executed (in 0103 the
+  same, so 418 may not have been at fault). 0105: the star chest's 420
+  waits for 451's echo: works (tested). 0106: silent exp chests (whose
+  opening the client reports only with its next command) no longer hold
+  the season end back (tested).
+- 0107: after the star chest, 21 exp chests were pushed at once; the
+  client opened 20 in one go, levelled up four times and its level-up
+  popup (which opens only the current level's chest, 0x45fd8c) got stuck.
+  Exp and level chests went one at a time (the next after the last
+  one's 550, a level chest first); a past level's chest comes in the home
+  as an ordinary chest. On the phone stuck again: the client opens its
+  chests one after the other and waited for the next exp chest's content
+  while the level-up popup was up.
+- 0108: all contents at once again, but only one level-up comes of an
+  upgrade batch: the exp chests after the one that reaches the next level
+  give nothing, their exp is held back (WithheldExp) and goes into the
+  level chest, as much as the next level takes, so every popup is one
+  level.
+- 0108 on the phone: hung again, and the log shows why (also for 0106 and
+  0107): the server made one exp chest more than the client (19 to 18),
+  so the client's level chest had the index of the server's last exp
+  chest and got its content. The client's season end takes the minis'
+  fragments too (0x48aaa0), the server kept them and upgraded once more.
+  0109: the fragments go on the server as well (tested 7 November 2026:
+  star chest, several level-ups, no hang).
+- Open: 418 again, after 451's echo, so the road's rewards come apart
+  from the star chest as in the original.
 
 ### A9. News tab (dropped)
 

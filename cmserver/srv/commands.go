@@ -97,6 +97,8 @@ func (c command) String() string {
 		return "LogicUpdateChronosEventsCommand (ours, echoed)"
 	case cmdServerClaimReward:
 		return fmt.Sprintf("LogicClaimRewardCommand (ours, echoed) chest #%d", c.args[0])
+	case cmdServerSeasonEnd:
+		return fmt.Sprintf("LogicSeasonEndCommand (ours, echoed) season %d", c.args[0])
 	}
 	if l, ok := skipLayouts[c.typ]; ok {
 		return fmt.Sprintf("%s %v", l.name, c.args)
@@ -209,6 +211,16 @@ func parseEndClientTurn(p []byte) (cmds []command, err error) {
 					r.Bool()
 				}
 			}
+		case cmdServerSeasonEnd:
+			// the client echoes our 451 (encoder 0x4a8254): VInt, Int
+			// season, Int event, two Longs, the server command base
+			r.VInt()
+			c.args = []int32{r.Int()}
+			r.Int()
+			r.Long()
+			r.Long()
+			r.VInt()
+			base(r)
 		case cmdServerClaimReward:
 			// the client echoes our 420 (encoder 0x37fee8): the content,
 			// VInt chest index, the server command base, the base

@@ -211,8 +211,33 @@ func (a *Account) ClaimSeasonRewards(r *Reward) (tiers int) {
 
 // claimSeason claims the tiers s reached and has not claimed.
 func (a *Account) claimSeason(r *Reward, s *SeasonState) (tiers int) {
-	var c ChestContent
-	first := int32(0)
+	c, first, tiers := a.claimSeasonContent(s)
+	if tiers == 0 || first == 0 {
+		return tiers
+	}
+	a.pushChest(r, first, sourceSeason, c)
+	if n := len(a.Chests); ChestsInHome && n > 0 && a.Chests[n-1].Index == a.ChestIndex {
+		a.Chests[n-1].SourceValue = s.Key
+	}
+	return tiers
+}
+
+// seasonUnclaimed: tiers s reached and has not claimed.
+func seasonUnclaimed(s *SeasonState) bool {
+	for _, t := range seasonTiers {
+		if t.Points > s.Points {
+			break
+		}
+		if t.Points > s.Claimed || (seasonPassFree && t.Points > s.PaidClaimed) {
+			return true
+		}
+	}
+	return false
+}
+
+// claimSeasonContent marks the tiers s reached claimed and rolls their
+// chests into one content; first is the first chest.
+func (a *Account) claimSeasonContent(s *SeasonState) (c ChestContent, first int32, tiers int) {
 	take := func(chests []int32) {
 		for _, chest := range chests {
 			if first == 0 {
@@ -244,14 +269,7 @@ func (a *Account) claimSeason(r *Reward, s *SeasonState) (tiers int) {
 		}
 	}
 	s.Claimed, s.PaidClaimed = free, paid
-	if tiers == 0 || first == 0 {
-		return tiers
-	}
-	a.pushChest(r, first, sourceSeason, c)
-	if n := len(a.Chests); ChestsInHome && n > 0 && a.Chests[n-1].Index == a.ChestIndex {
-		a.Chests[n-1].SourceValue = s.Key
-	}
-	return tiers
+	return c, first, tiers
 }
 
 // seasonPassFree: the Mini Pass (real money in the original) is everyone's.

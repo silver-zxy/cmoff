@@ -31,7 +31,18 @@ type Account struct {
 	// LastSeasonEnd: what the last season's end gave (seasonend.go), until
 	// logged
 	LastSeasonEnd string `json:"-"`
-	SkinsLocked   bool   `json:"skins_locked,omitempty"`
+	// SeasonEndKey: the avatar's season key (+0x44), the last season whose
+	// end the client did; SeasonEndDue: a season ended and 451 is still to
+	// come (seasonend.go); SeasonEndTrophies, SeasonEndBest: the avatar's
+	// +0x4c and +0x50 the client keeps then
+	SeasonEndKey      int32 `json:"season_end_key,omitempty"`
+	SeasonEndDue      bool  `json:"season_end_due,omitempty"`
+	SeasonEndTrophies int32 `json:"season_end_trophies,omitempty"`
+	SeasonEndBest     int32 `json:"season_end_best,omitempty"`
+	// SeasonEndRoad: the ended season's road with tiers not claimed, given
+	// after 451 (seasonend.go)
+	SeasonEndRoad *SeasonState `json:"season_end_road,omitempty"`
+	SkinsLocked   bool         `json:"skins_locked,omitempty"`
 	// Trophies (RankPoints) from ranked battles, see ranked.go.
 	Trophies     int32 `json:"trophies"`
 	BestTrophies int32 `json:"best_trophies"`
@@ -54,6 +65,9 @@ type Account struct {
 	// last chest index given out.
 	Chests     []PendingChest `json:"chests,omitempty"`
 	ChestIndex int32          `json:"chest_index,omitempty"`
+	// WithheldExp: upgrade exp held back for the next level chests
+	// (pushUpgradeExp)
+	WithheldExp int32 `json:"withheld_exp,omitempty"`
 	// LevelChests: player levels whose level chest was given.
 	LevelChests []int32 `json:"level_chests,omitempty"`
 	// Daily quests (quests.go): today's, the day, the last quest id.
@@ -288,8 +302,9 @@ func (a *Account) ownHome() ownHomeData {
 	m.avatar.streakAll = s.Streak
 	m.avatar.streakRanked = s.RankedStreak
 	if a.Progression {
+		a.giveSeasonEndRoad()
 		a.fillCollection(&m)
-		h.chests = a.Chests
+		h.chests = homeChests(a.Chests, a.expLevel())
 	}
 	h.chestIndex = a.ChestIndex
 	h.daily = a.dailyGold()
@@ -312,7 +327,11 @@ func (a *Account) ownHome() ownHomeData {
 		h.season = a.season()
 		h.purchases = a.shopPurchases()
 		h.seasonSeen = h.season.Seen - 1
+		if a.SeasonEndKey == 0 && a.Progression {
+			a.SeasonEndKey = h.season.Key // no 451 for a season before
+		}
 	}
+	m.avatar.seasonEnd = [3]int32{a.SeasonEndKey, a.SeasonEndTrophies, a.SeasonEndBest}
 	return m
 }
 

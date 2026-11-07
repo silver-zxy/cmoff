@@ -233,3 +233,22 @@ func TestQuestProgressReport(t *testing.T) {
 		t.Fatalf("quest %+v", acc.Quests[0])
 	}
 }
+
+// 451 as its decoder 0x4a96e0 reads it: VInt, Int key, Int event, two
+// Longs, then the bases.
+func TestSeasonEndServerCommand(t *testing.T) {
+	r := proto.NewReader(seasonEndServerCommand(home.SeasonEnd{Key: 36, Event: 2001}))
+	if r.VInt() != cmdServerSeasonEnd || r.VInt() != 0 || r.Int() != 36 || r.Int() != 2001 {
+		t.Fatal("head")
+	}
+	r.Long()
+	r.Long()
+	for _, want := range []int32{0, -1, 0, 1, 0} {
+		if got := r.VInt(); got != want {
+			t.Fatalf("base %d, want %d", got, want)
+		}
+	}
+	if r.Err() != nil {
+		t.Fatal(r.Err())
+	}
+}

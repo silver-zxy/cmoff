@@ -261,7 +261,10 @@ func (a *Account) addChest(r *Reward, chest, source int32, c ChestContent, push 
 }
 
 // TakePushes returns the chests to send with 420 now and forgets them as
-// pushes (they stay waiting until opened).
+// pushes (they stay waiting until opened). All at once: the client opens
+// its chests one after the other and waits for each one's content, so
+// holding one back (0107: exp chests one at a time) left it waiting while
+// the level-up popup was up, stuck.
 func (a *Account) TakePushes() []PendingChest {
 	var out []PendingChest
 	for i := range a.Chests {
@@ -271,6 +274,25 @@ func (a *Account) TakePushes() []PendingChest {
 		}
 	}
 	return out
+}
+
+// homeChests: the chests as the home brings them. A level chest of a level
+// below the current one opens like any chest: the level-up popup takes
+// only the current level's (0x45fd8c), so such a chest (several level-ups
+// at once before 0107) stayed stuck.
+func homeChests(chests []PendingChest, level int32) []PendingChest {
+	out := append([]PendingChest(nil), chests...)
+	for i := range out {
+		if out[i].Source == sourcePlayerLevel && out[i].SourceValue != level {
+			out[i].Source, out[i].SourceValue = 0, 0
+		}
+	}
+	return out
+}
+
+func (a *Account) expLevel() int32 {
+	l, _ := ExpLevel(a.Exp)
+	return l
 }
 
 // ClearPushes: a home is sent, which has every chest with its content.
@@ -306,8 +328,35 @@ func (a *Account) openContent(r *Reward, c ChestContent) {
 	for _, l := range r.LevelUps[levels:] {
 		a.pushLevelChest(r, l)
 	}
-	for n := a.autoUpgrade(r); n > 0; n-- {
-		a.pushChest(r, upgradeRewardChest, sourceUpgrade, upgradeExpContent())
+	a.pushUpgradeExp(r, a.autoUpgrade(r))
+}
+
+// pushUpgradeExp makes the exp chests of n upgrades. Only one player level
+// may come of them: the client levels up as it opens them, makes a level
+// chest for each level reached, and its level-up popup opens only the
+// current level's chest (0x45fd8c, "Invalid current level"), so with four
+// level-ups at once it got stuck (0106). So the exp chests after the one
+// that reaches the next level give nothing, and their exp is held back
+// (WithheldExp) and goes into the level chest, as much as the next level
+// takes (pushLevelChest): one level-up per popup.
+func (a *Account) pushUpgradeExp(r *Reward, n int32) {
+	exp := a.Exp
+	for _, c := range a.Chests {
+		exp += c.Content.Resources["ExpPoints"]
+	}
+	level, _ := ExpLevel(exp)
+	held := a.WithheldExp > 0
+	for ; n > 0; n-- {
+		e := upgradeExp()
+		c := upgradeExpContent()
+		if held {
+			a.WithheldExp += e
+			c = ChestContent{}
+		} else if l, _ := ExpLevel(exp + e); l > level {
+			held = true
+		}
+		exp += e
+		a.pushChest(r, upgradeRewardChest, sourceUpgrade, c)
 	}
 }
 
@@ -325,7 +374,20 @@ func (a *Account) pushLevelChest(r *Reward, level int32) {
 		}
 	}
 	a.LevelChests = append(a.LevelChests, level)
-	a.pushChest(r, levelChest(level), sourcePlayerLevel, a.levelChestContent(level))
+	c := a.levelChestContent(level)
+	if a.WithheldExp > 0 {
+		// the exp held back (pushUpgradeExp), up to the next level
+		e := a.WithheldExp
+		if l, pts := ExpLevel(a.Exp); l == level && l < MaxExpLevel {
+			e = min(e, expToNext[l-1]-pts)
+		}
+		a.WithheldExp -= e
+		if c.Resources == nil {
+			c.Resources = map[string]int32{}
+		}
+		c.Resources["ExpPoints"] += e
+	}
+	a.pushChest(r, levelChest(level), sourcePlayerLevel, c)
 	if n := len(a.Chests); ChestsInHome && n > 0 && a.Chests[n-1].Index == a.ChestIndex {
 		a.Chests[n-1].SourceValue = level
 	}

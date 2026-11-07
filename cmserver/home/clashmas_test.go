@@ -145,9 +145,9 @@ func TestDevMode(t *testing.T) {
 	}
 }
 
-// The season's end: the road's tiers reached come, the minis' stars are
-// exchanged (back to level 1, the tier's chests), trophies from Diamond 3
-// up go back; a new season starts.
+// The season's end: the road's tiers reached come at once; the rest is due
+// for 451: the minis' stars are exchanged (back to level 1, the tier's
+// chests in one chest), trophies from Diamond 3 up go back.
 func TestSeasonEnd(t *testing.T) {
 	Data = shopData()
 	defer func() { Data = nil }()
@@ -156,26 +156,54 @@ func TestSeasonEnd(t *testing.T) {
 	defer func() { now = time.Now }()
 	a := NewAccount()
 	a.StartProgression()
-	a.season().Points = 10
+	old := a.season()
+	old.Points = 10
+	oldKey := old.Key
 	for i, r := range miniSeasonalRows {
 		if i < 4 {
 			a.entry(miniID(r)).Level = 4 // 3 stars each: 12
+			a.entry(miniID(r)).Fragments = 7
 		}
 	}
 	a.Trophies = 950
+	a.ownHome() // the avatar's season key
 	chests := len(a.Chests)
 	day = day.AddDate(0, 3, 0)
+	m := a.ownHome()
 	s := a.season()
-	if s.Points != 0 || a.Trophies != 800 || len(a.Chests) != chests+2 || a.miniStars() != 0 {
-		t.Fatalf("points %d trophies %d chests %d stars %d: %s", s.Points, a.Trophies, len(a.Chests)-chests, a.miniStars(), a.LastSeasonEnd)
+	// the home: the road anew and the old one to claim, the rest as before
+	if s.Points != 0 || a.Trophies != 950 || len(a.Chests) != chests || a.miniStars() != 12 ||
+		!a.SeasonEndDue || m.avatar.seasonEnd[0] != oldKey || a.SeasonEndRoad == nil || a.SeasonEndRoad.Key != oldKey {
+		t.Fatalf("points %d trophies %d chests %d stars %d due %v avatar %v: %s", s.Points, a.Trophies,
+			len(a.Chests)-chests, a.miniStars(), a.SeasonEndDue, m.avatar.seasonEnd, a.LastSeasonEnd)
 	}
-	if a.owned(miniID(miniSeasonalRows[0])).Level != 1 {
-		t.Fatal("stars kept")
+	a.Chests, chests = nil, 0
+	end, ok := a.TakeSeasonEnd()
+	if !ok || end.Key != s.Key || a.Trophies != 800 || len(a.Chests) != 1 || a.SeasonEndRoad != nil || a.miniStars() != 0 {
+		t.Fatalf("451 %v %+v trophies %d stars %d chests %d", ok, end, a.Trophies, a.miniStars(), len(a.Chests)-chests)
+	}
+	ch := a.Chests[0]
+	if len(ch.List) != 4 || ch.List[3] != 127_000_137 || ch.Source != sourceSeasonEnd || ch.SourceValue != s.Key || !ch.Push {
+		t.Fatalf("star chest %+v", ch)
+	}
+	if o := a.owned(miniID(miniSeasonalRows[0])); o.Level != 1 || o.Fragments != 0 {
+		t.Fatalf("mini after the reset %+v (the client takes the fragments too)", o)
+	}
+	if m := a.ownHome(); m.avatar.seasonEnd != [3]int32{s.Key, 950, a.BestTrophies} {
+		t.Fatalf("avatar %v", m.avatar.seasonEnd)
+	}
+	if _, ok := a.TakeSeasonEnd(); ok {
+		t.Fatal("451 twice")
 	}
 	// below Diamond 3 the trophies stay; under 6 stars no star chest
 	a.Trophies = 650
-	if msg := a.EndSeasonNow(); a.Trophies != 650 || msg == "" {
-		t.Fatalf("trophies %d: %s", a.Trophies, msg)
+	a.Chests = nil
+	chests = len(a.Chests)
+	if msg := a.EndSeasonNow(); msg == "" {
+		t.Fatal("no season end")
+	}
+	if _, ok := a.TakeSeasonEnd(); !ok || a.Trophies != 650 || len(a.Chests) != chests {
+		t.Fatalf("451 %v trophies %d chests %d", ok, a.Trophies, len(a.Chests)-chests)
 	}
 }
 
@@ -183,7 +211,55 @@ func TestSeasonEnd(t *testing.T) {
 func TestDevStart(t *testing.T) {
 	a := NewAccount()
 	a.StartProgression()
-	if msg := a.DevStart(); a.Trophies != 800 {
+	msg := a.DevStart()
+	if _, ok := a.TakeSeasonEnd(); !ok || a.Trophies != 800 {
 		t.Fatalf("trophies %d: %s", a.Trophies, msg)
+	}
+}
+
+// 451 waits for the home's chests; dev mode does not pile season ends.
+func TestSeasonEndAfterChests(t *testing.T) {
+	a := NewAccount()
+	a.StartProgression()
+	a.Chests = append(a.Chests, PendingChest{Index: 1, Chest: chestSeasonGold50, Show: true})
+	if msg := a.DevStart(); a.SeasonEndDue {
+		t.Fatalf("season end with chests: %s", msg)
+	}
+	a.Chests = nil
+	a.DevStart()
+	a.Chests = append(a.Chests, PendingChest{Index: 2, Chest: chestSeasonGold50, Show: true})
+	if _, ok := a.TakeSeasonEnd(); ok || !a.SeasonEndDue {
+		t.Fatal("451 before the chests")
+	}
+	// silent exp chests do not hold it back
+	a.Chests = []PendingChest{{Index: 3, Chest: upgradeRewardChest}}
+	if _, ok := a.TakeSeasonEnd(); !ok {
+		t.Fatal("no 451")
+	}
+}
+
+// Under 6 stars the ended road's rewards come with the next home.
+func TestSeasonEndRoadNextHome(t *testing.T) {
+	Data = shopData()
+	defer func() { Data = nil }()
+	a := NewAccount()
+	a.StartProgression()
+	a.Chests = nil
+	a.season().Points = 10
+	a.EndSeasonNow()
+	if a.SeasonEndRoad == nil {
+		t.Fatal("no road to give")
+	}
+	a.ownHome()
+	if len(a.Chests) != 0 {
+		t.Fatal("road chest before 451")
+	}
+	if _, ok := a.TakeSeasonEnd(); !ok || a.SeasonEndRoad == nil {
+		t.Fatal("451")
+	}
+	a.ownHome()
+	// (the test data may not roll the road's chests: then no chest)
+	if a.SeasonEndRoad != nil || (len(a.Chests) > 0 && (a.Chests[0].Source != sourceSeason || a.Chests[0].Push)) {
+		t.Fatalf("road chest %+v", a.Chests)
 	}
 }

@@ -52,6 +52,9 @@ type Server struct {
 
 	mu      sync.Mutex
 	pending battle // the bot battle the client is playing, until its result
+	// seasonHeld: the star chest's content (420), held until the client
+	// echoes 451 (sendSeasonEnd)
+	seasonHeld []home.PendingChest
 }
 
 // battle is a started bot battle: its mode and whether it counts (ranked).
@@ -233,6 +236,15 @@ func (s *Server) handle(c net.Conn) {
 			}
 			mode, ranked := apply(s.acc, cmds)
 			s.pushChests(c, sess)
+			for _, cmd := range cmds {
+				if cmd.typ == cmdServerSeasonEnd {
+					s.releaseSeasonEnd(c, sess)
+				}
+			}
+			if mode == 0 {
+				// a season's end waiting for the home's chests
+				s.sendSeasonEnd(c, sess)
+			}
 			if mode > 0 {
 				// Battle signal for the client hook: a KeepAliveServer the
 				// client did not ask for. Its body is padded with
@@ -469,6 +481,9 @@ func (s *Server) sendHome(c net.Conn, sess *pepper.Session) {
 	}
 	s.acc.ClearPushes()
 	s.acc.Unlock()
+	s.mu.Lock()
+	s.seasonHeld = nil
+	s.mu.Unlock()
 	if len(list) > 0 {
 		log.Printf("-> home with %d chests to open: %s", len(list), strings.Join(list, "; "))
 	}
@@ -476,7 +491,7 @@ func (s *Server) sendHome(c net.Conn, sess *pepper.Session) {
 		log.Printf("-> home with quests: %s", q)
 	}
 	s.acc.Lock()
-	ended := s.acc.TakeSeasonEnd()
+	ended := s.acc.TakeSeasonEndLog()
 	s.acc.Unlock()
 	if ended != "" {
 		log.Printf("-> home after the season's end: %s", ended)
@@ -487,6 +502,69 @@ func (s *Server) sendHome(c net.Conn, sess *pepper.Session) {
 		log.Printf("-> home with game modes: %s", s.acc.GameModeSummary())
 	}
 	s.send(c, sess, proto.OwnHomeData, s.acc.OwnHomeData())
+	s.sendSeasonEnd(c, sess)
+}
+
+// releaseSeasonEnd: the client ran 451 (its echo), so the star chest is
+// there: its content now. Sent with 451 at once after the home (0103,
+// 0104), the 420 was lost (never echoed) and the chest stayed empty.
+func (s *Server) releaseSeasonEnd(c net.Conn, sess *pepper.Session) {
+	s.mu.Lock()
+	held := s.seasonHeld
+	s.seasonHeld = nil
+	s.mu.Unlock()
+	for _, ch := range held {
+		log.Printf("-> content of chest %d #%d after 451 (%s)", ch.Chest, ch.Index, ch.Content)
+		s.send(c, sess, proto.AvailableServerCommand, claimRewardServerCommand(ch))
+	}
+}
+
+// cmdServerSeasonEnd is LogicSeasonEndCommand 451, a server command
+// (decoder 0x4a96e0, execute 0x95918c): the client ends the season itself,
+// with the popup "Season has ended!" (home/seasonend.go).
+const cmdServerSeasonEnd = 451
+
+// sendSeasonEnd sends 451 for a season's end due; the star chest's
+// content (420) waits for its echo (releaseSeasonEnd). It waits until no chest is left in the home: 451 at
+// once after a home with chests (0101) ran the trophy reset's league
+// screen into the chests' popups, and the home got stuck.
+func (s *Server) sendSeasonEnd(c net.Conn, sess *pepper.Session) {
+	s.acc.Lock()
+	end, ok := s.acc.TakeSeasonEnd()
+	s.acc.Unlock()
+	if !ok {
+		return
+	}
+	log.Printf("-> season end (451): %s", end.Log)
+	s.send(c, sess, proto.AvailableServerCommand, seasonEndServerCommand(end))
+	s.acc.Lock()
+	held := s.acc.TakePushes()
+	s.acc.Unlock()
+	s.mu.Lock()
+	s.seasonHeld = held
+	s.mu.Unlock()
+	if err := s.acc.Save(); err != nil {
+		log.Printf("save account: %v", err)
+	}
+}
+
+// seasonEndServerCommand: 451 in AvailableServerCommand: VInt +0x24, Int
+// the new season key, Int its event, Long +0x30, Long +0x38 (0: the
+// avatar's +0x58 stays as in the home), the bases as for 417.
+func seasonEndServerCommand(end home.SeasonEnd) []byte {
+	w := proto.NewWriter()
+	w.VInt(cmdServerSeasonEnd)
+	w.VInt(0)
+	w.Int(end.Key)
+	w.Int(end.Event)
+	w.Long(0, 0)
+	w.Long(0, 0)
+	w.VInt(0) // server command base
+	w.VInt(-1)
+	w.VInt(0)
+	w.VInt(1)
+	w.VInt(0) // LogicCommand base
+	return w.Bytes()
 }
 
 // cmdServerClaimReward is LogicClaimRewardCommand 420, a server command

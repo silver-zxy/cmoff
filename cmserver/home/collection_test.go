@@ -158,6 +158,7 @@ func TestChestsAndDailyGoldInHome(t *testing.T) {
 	a.matchGold(&Reward{}, 30)
 	a.queueChest(nil, winChest, ChestContent{Fragments: map[int32]int32{miniID(7): 2}})
 	a.queueChestFrom(nil, 127_000_184, sourcePlayerLevel, ChestContent{Resources: map[string]int32{"Gold": 100, "Diamonds": 10}})
+	a.Chests[len(a.Chests)-1].SourceValue = a.expLevel() // the current level's
 	h := a.ownHome()
 	h.home.skinStore = false
 	m, err := decode(h.encode())
@@ -460,5 +461,37 @@ func TestBattleRounds(t *testing.T) {
 	a.BattleRounds(ModeDuel, 1, 3, 0) // 3:0
 	if a.Quests[0].Progress != 9 || a.Quests[2].Progress != 1 {
 		t.Fatalf("progress %+v", a.Quests)
+	}
+}
+
+// Many upgrades at once: one level-up, the rest of the exp in the level
+// chests, a level at a time; a past level's chest comes as an ordinary one.
+func TestUpgradeExpOneLevelAtATime(t *testing.T) {
+	a := NewAccount()
+	a.StartProgression()
+	a.Chests = nil
+	a.pushUpgradeExp(nil, 30)
+	got := int32(0)
+	for _, c := range a.Chests {
+		got += c.Content.Resources["ExpPoints"]
+	}
+	if got+a.WithheldExp != 30*upgradeExp() || a.WithheldExp == 0 {
+		t.Fatalf("exp %d held %d", got, a.WithheldExp)
+	}
+	levels := 0
+	for len(a.Chests) > 0 {
+		c := a.Chests[0]
+		r, _, _ := a.OpenPending(c.Index)
+		if len(r.LevelUps) > 1 {
+			t.Fatalf("%d level-ups at once", len(r.LevelUps))
+		}
+		levels += len(r.LevelUps)
+	}
+	if a.WithheldExp != 0 || levels < 2 {
+		t.Fatalf("held %d, %d levels", a.WithheldExp, levels)
+	}
+	h := homeChests([]PendingChest{{Source: sourcePlayerLevel, SourceValue: 2}}, 3)
+	if h[0].Source == sourcePlayerLevel {
+		t.Fatal("past level chest kept its source")
 	}
 }

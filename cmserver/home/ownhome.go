@@ -105,6 +105,9 @@ type clientAvatar struct {
 	gems          int32 // +0xc4: diamonds (HUD 0x4d24a0)
 	lastTrophies  int32 // +0x74 "lastScore"
 	seasonBest    int32 // +0x34 "seasonBestScore"
+	// seasonEnd: +0x44 the season key, +0x4c the trophies and +0x50 the
+	// best at the last season's end (seasonend.go)
+	seasonEnd [3]int32
 
 	// Battle statistics, [0] duel, [1] Rumble (avatar JSON 0x392f00; the
 	// profile's battle_status 0x49cd10 reads counts, wins and rank-top[1]).
@@ -340,7 +343,11 @@ func (a *clientAvatar) encodeHead(w *proto.Writer) {
 	w.VInt(a.trophies)     // +0x70
 	w.VInt(a.lastTrophies) // +0x74
 	w.VInt(a.seasonBest)   // +0x34
-	vints(w, 7)            // +0x38..+0x50
+	vints(w, 3)            // +0x38 +0x3c +0x40 (decoder 0x72cbb4)
+	w.VInt(a.seasonEnd[0]) // +0x44
+	w.VInt(0)              // +0x48
+	w.VInt(a.seasonEnd[1]) // +0x4c
+	w.VInt(a.seasonEnd[2]) // +0x50
 	w.Long90(0, 0)         // +0x58
 	w.VInt(int32(len(a.slots)))
 	for _, list := range a.slots {
