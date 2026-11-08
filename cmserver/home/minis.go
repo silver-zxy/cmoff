@@ -258,7 +258,14 @@ func (a *Account) NewMiniQuests() ([]LiveEvent, bool) {
 		return nil, false
 	}
 	before := a.QuestID
+	// in the home's order (ownHome): the new minis' chains, then a chain
+	// that starts now (the tutorial chain once the player has Magic Archer
+	// or Shield Skeleton, 0127); the client starts the chains it has no
+	// state for in the events' order with the next ids, as the server
 	a.refreshMiniQuests()
+	if chainsOn() {
+		a.refreshChains()
+	}
 	if a.QuestID == before {
 		return nil, false
 	}

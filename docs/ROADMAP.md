@@ -338,6 +338,14 @@ Still to do:
   5000 / 25000 / 75000 gold (decided: free they made gems worthless; a gem
   costs 75-100 gold and gives 16-18 in the gold packs, so going round
   does not pay).
+- 0126: the tutorial's step 1 showed Magic Archer and was done with
+  Shield Skeleton: its mini was picked anew with every look and changed
+  when the player got Shield Skeleton during the session. It is picked
+  once and kept (Magic Archer if the player has it, else Shield
+  Skeleton); the chain starts once the player has one of the two.
+- 0127: that start waited for the next home (a match or a restart); now
+  it comes at once with the events update (417) that also brings a new
+  mini's quests.
 - Tested 7 November 2026: everything from 0112 to 0121 works on the
   phone. The offline mode is done; next: the Mini Room (A10).
 - 418 (the road's rewards apart from the star chest): not a goal (0111

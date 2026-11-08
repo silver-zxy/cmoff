@@ -25,6 +25,26 @@ func TestChains(t *testing.T) {
 	}
 	a := NewAccount()
 	a.StartProgression()
+	own := func(name string) {
+		row, _ := Data.CharRow(name)
+		for i, r := range miniCharRows {
+			if r == row {
+				a.entry(miniID(miniSeasonalRows[i])).Level = 1
+			}
+		}
+	}
+	// no tutorial chain before the player has one of step 1's minis
+	a.Collection = map[int32]*Owned{}
+	a.ownHome()
+	if a.chain(tutorialChainEvent) != nil {
+		t.Fatal("tutorial chain without Magic Archer or Shield Skeleton")
+	}
+	// it starts during the session once the player has one (the events
+	// again with 417, as for a new mini's quests)
+	own("ShieldSkeletonB1")
+	if _, ok := a.NewMiniQuests(); !ok || a.chain(tutorialChainEvent) == nil {
+		t.Fatal("tutorial chain not started during the session")
+	}
 	h := a.ownHome()
 	h.home.skinStore = false
 	if _, err := decode(h.encode()); err != nil {
@@ -42,6 +62,21 @@ func TestChains(t *testing.T) {
 	}
 	if found != 2 {
 		t.Fatalf("home chains %+v", lastChains)
+	}
+	// step 1's mini stays the one picked, Shield Skeleton, after the
+	// player gets Magic Archer too; Magic Archer in the deck does not do it
+	if tut.Variant != 2 {
+		t.Fatalf("variant %d", tut.Variant)
+	}
+	own("EliteArcherB1")
+	archer, _ := Data.CharRow("EliteArcherB1")
+	for i, r := range miniCharRows {
+		if r == archer {
+			a.Swap(miniSeasonalRows[i], 0, -1)
+		}
+	}
+	if len(a.TakeQuestUpdates()) != 0 || tutorialSteps(a)[0].Own["RequirementMini"] != "ShieldSkeletonB1" {
+		t.Fatal("Magic Archer did Shield Skeleton's step")
 	}
 	// step 1: done when the deck gets its mini, at once (351); a battle
 	// alone does not do it

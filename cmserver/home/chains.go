@@ -50,7 +50,8 @@ type ChainState struct {
 	Step  int32 `json:"step"`
 	Quest Quest `json:"quest"`
 	Done  bool  `json:"done,omitempty"`
-	// Variant: unused since 0116 (the first step's mini is picked anew)
+	// Variant: the tutorial chain's first step, picked once at its start
+	// and kept (0126): 1 Magic Archer, 2 Shield Skeleton (0: not yet)
 	Variant int32 `json:"variant,omitempty"`
 }
 
@@ -152,12 +153,12 @@ func tutorialSteps(a *Account) []questDef {
 	// deck (the kind has no unit), so it is a PlayWithUnit of that mini,
 	// which the client counts only in battle; the server marks it done
 	// once the deck has the mini and tells the client at once (351,
-	// deckChanged; 0120). The mini: Magic Archer if the player has it, else
-	// Shield Skeleton if the player has that, else Magic Archer.
+	// deckChanged; 0120). The mini is the chain's Variant, picked once
+	// (tutorialVariant): picked anew with every look, it changed when the
+	// player got Shield Skeleton during the session, and the quest that
+	// showed Magic Archer was done with Shield Skeleton (0126).
 	mini, text := "EliteArcherB1", "TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_1_MAGICARCHERSWAP"
-	archer, okA := Data.CharRow("EliteArcherB1")
-	skel, okS := Data.CharRow("ShieldSkeletonB1")
-	if !(okA && a.ownsChar(archer)) && okS && a.ownsChar(skel) {
+	if s := a.chain(tutorialChainEvent); s != nil && s.Variant == 2 {
 		mini, text = "ShieldSkeletonB1", "TID_CHRONOS_QUESTS_TUTORIAL_CHAIN_1_SHIELDSKELETONSWAP"
 	}
 	r := []int32{chestMystery}
@@ -198,6 +199,17 @@ func chainByEvent(event int32) (chainDef, bool) {
 // chainsOn: the chains need the game data (names, chests) and live quests.
 func chainsOn() bool { return Live && Data != nil }
 
+// tutorialVariant: step 1's mini: Magic Archer (1) if the player has it,
+// else Shield Skeleton (2) if the player has that, else none yet (0).
+func (a *Account) tutorialVariant() int32 {
+	for i, name := range []string{"EliteArcherB1", "ShieldSkeletonB1"} {
+		if row, ok := Data.CharRow(name); ok && a.ownsChar(row) {
+			return int32(i + 1)
+		}
+	}
+	return 0
+}
+
 func (a *Account) ownsChar(row int32) bool {
 	for i, r := range miniCharRows {
 		if r == row {
@@ -234,14 +246,26 @@ func (a *Account) refreshChains() {
 	if !chainsOn() || !a.Progression {
 		return
 	}
+	if s := a.chain(tutorialChainEvent); s != nil && s.Variant == 0 {
+		s.Variant = a.tutorialVariant()
+		if s.Variant == 0 {
+			s.Variant = 1
+		}
+	}
 	for _, c := range chainDefs {
 		if a.chain(c.event) != nil || len(c.steps(a)) == 0 {
 			continue
 		}
-		if c.event == tutorialChainEvent && a.expLevel() > tutorialChainMaxLevel {
-			continue
-		}
 		s := ChainState{Event: c.event}
+		if c.event == tutorialChainEvent {
+			if a.expLevel() > tutorialChainMaxLevel {
+				continue
+			}
+			// it starts once the player has one of step 1's minis
+			if s.Variant = a.tutorialVariant(); s.Variant == 0 {
+				continue
+			}
+		}
 		a.QuestID++
 		s.Quest = Quest{ID: a.QuestID}
 		a.Chains = append(a.Chains, s)
