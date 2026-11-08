@@ -32,7 +32,8 @@ import "fmt"
 // highest season_rewards.csv tier with StarCount <= stars (0x84770c) and
 // the league's SeasonResetChestIds (none in leagues.json), sets every mini
 // back to level 1 and takes its fragments (0x48aaa0), resets the trophies by the league (0x483e40),
-// shows the popup (listener +0x198) and, for a tier, makes one chest of
+// tells the avatar's listener (+0x198; in this build the plain
+// LogicAvatarChangeListener, an empty function: no popup, 0132) and, for a tier, makes one chest of
 // the tier's chests (0x6e1a5c, source 9, value the new key) whose content
 // the server pushes (420). The road's manager is left alone when its key
 // is the new one already (0x8fbefc).

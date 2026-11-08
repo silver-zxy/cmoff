@@ -323,7 +323,9 @@ func seasonLiveEvent() LiveEvent {
 		"ShowEndTime": true,
 		// the "i" button: InfoPageConfig (0x6e95a8: InfoPageSWF,
 		// LayoutExportName, PagesExportName), the game's season 1 info
-		// page in the road file
+		// page in the road file. At a new season the client opens it by
+		// itself; it was not what kept the popup "Season has ended!"
+		// away (0128 had it off: no popup either, 0130)
 		"HasInfoPage": true,
 		"InfoPageConfig": map[string]any{
 			"InfoPageSWF":      "sc/season_road_01.sc",

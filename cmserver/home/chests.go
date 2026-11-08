@@ -306,9 +306,9 @@ func (a *Account) CatchUp() string {
 	a.Lock()
 	r := &Reward{}
 	if a.Progression {
-		for n := a.autoUpgrade(r); n > 0; n-- {
-			a.queueChestFrom(r, upgradeRewardChest, sourceUpgrade, upgradeExpContent())
-		}
+		// one level-up at most, as with pushed exp chests (0129: 20 exp
+		// chests in a home gave two level-ups at once)
+		a.upgradeExpChests(r, a.autoUpgrade(r), false)
 	}
 	coins := int32(0)
 	if a.Progression {

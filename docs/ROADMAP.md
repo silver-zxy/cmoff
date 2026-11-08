@@ -346,6 +346,27 @@ Still to do:
 - 0127: that start waited for the next home (a match or a restart); now
   it comes at once with the events update (417) that also brings a new
   mini's quests.
+- 0128 (a test): at the season's end the client showed the season's info
+  page ("Welcome to Clash Mini! Pre-Season 1", HasInfoPage, season data
+  +0x61) and never the popup "Season has ended!" / "You are now:". The
+  info page is off to see whether the popup comes then (the road's "i"
+  button goes with it for now).
+- 0130: the info page is back: without it no popup either. 451 runs
+  (echoed: stars, trophies, the chest) but the client shows no "Season
+  has ended!", not after a match back in the home either
+  (SHOW_SEASON_END_POPUP_SEC_AFTER_HOME). What the client needs for
+  it (the avatar listener's +0x198, avatar +0x48 / +0x4c / +0x50).
+- 0132: found: this build has no popup for the season's end. 451 hands
+  the end to the avatar's listener (avatar +0xd0, +0x198), and at run time
+  that listener is the plain LogicAvatarChangeListener (vtable 0xeca308,
+  logged by the hook in 0131) whose +0x198 is an empty function
+  (0xa3663c: ret); no class in libg overrides it, and nothing reads the
+  global SHOW_SEASON_END_POPUP_SEC_AFTER_HOME. The texts are there, the
+  screen is not (later builds). What 1.1143.2 shows at a new season is the
+  season's info page ("Welcome to Clash Mini! Pre-Season 1"), so that is
+  as in the original. Done.
+- 0129: exp chests the server makes for the home (CatchUp) also give one
+  level-up at most (a home with 20 exp chests gave two at once).
 - Tested 7 November 2026: everything from 0112 to 0121 works on the
   phone. The offline mode is done; next: the Mini Room (A10).
 - 418 (the road's rewards apart from the star chest): not a goal (0111

@@ -339,7 +339,13 @@ func (a *Account) openContent(r *Reward, c ChestContent) {
 // that reaches the next level give nothing, and their exp is held back
 // (WithheldExp) and goes into the level chest, as much as the next level
 // takes (pushLevelChest): one level-up per popup.
-func (a *Account) pushUpgradeExp(r *Reward, n int32) {
+func (a *Account) pushUpgradeExp(r *Reward, n int32) { a.upgradeExpChests(r, n, true) }
+
+// upgradeExpChests makes the exp chests of n upgrades, pushed (the client
+// made them, 420) or queued for the home (CatchUp: the home brings them
+// whole; there a chest that gives nothing is left out, as the client never
+// knew it). One level-up at most, the rest held back (pushUpgradeExp).
+func (a *Account) upgradeExpChests(r *Reward, n int32, push bool) {
 	exp := a.Exp
 	for _, c := range a.Chests {
 		exp += c.Content.Resources["ExpPoints"]
@@ -356,7 +362,11 @@ func (a *Account) pushUpgradeExp(r *Reward, n int32) {
 			held = true
 		}
 		exp += e
-		a.pushChest(r, upgradeRewardChest, sourceUpgrade, c)
+		if push {
+			a.pushChest(r, upgradeRewardChest, sourceUpgrade, c)
+		} else {
+			a.queueChestFrom(r, upgradeRewardChest, sourceUpgrade, c)
+		}
 	}
 }
 
