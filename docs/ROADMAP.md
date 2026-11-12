@@ -392,7 +392,7 @@ does not simulate. The client takes a separate battle address and keys
 from UdpConnectionInfoMessage 23036 (decoder 0x7f93f0: a VInt, a string,
 an int, bytes), so the battle may go to another host than the home.
 
-1. Understand the client:
+1. Understand the client (findings in [MINIROOM.md](MINIROOM.md)):
    - the room messages: Create / Join / Leave / StartGameRoomMatch
      (10181, 10186, 14761, 10190), their responses (24566, 24568, 24571,
      24573), GameRoomMembers 20188, GameRoomShutdown 24572;

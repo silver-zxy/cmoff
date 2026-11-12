@@ -91,6 +91,7 @@ Details, Termux and troubleshooting: [docs/BUILDING.md](docs/BUILDING.md).
 - [docs/LIVE_CONTENT.md](docs/LIVE_CONTENT.md): quests, Adventure Road and shop (the live server's content)
 - [docs/ORIGINAL.md](docs/ORIGINAL.md): what is known of the original game around 1.1143.2, with sources
 - [docs/ROADMAP.md](docs/ROADMAP.md): what is done, what comes next, what is still unknown
+- [docs/MINIROOM.md](docs/MINIROOM.md): the Mini Room: room and battle messages, work notes
 - [docs/CLIENT_HOOK.md](docs/CLIENT_HOOK.md): what the hook does, every libg offset it uses
 - [docs/JOURNAL.md](docs/JOURNAL.md): how each problem was found and solved, including dead ends
 - [docs/RE_TOOLS.md](docs/RE_TOOLS.md): the analysis scripts
