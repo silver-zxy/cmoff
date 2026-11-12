@@ -871,6 +871,59 @@ static void watch_reload(void) {
  * server's home with the hero. If the battle ends without an end screen,
  * reconnect instead, and press the "Connection lost" popup's reload
  * button for the player (watch_reload). */
+#ifdef CMOFFLINE_SECTOR_DUMP
+/* Mini Room work (docs/MINIROOM.md): write the running bot battle as the
+ * client's own SectorState, the way its offline layer answers
+ * RequestSectorState (0x876d18), and log the bytes. Runs on this thread,
+ * not the game's, once per battle 2 s in (a test build only). */
+#define GH(a) G((a) - GHIDRA_BASE)
+static void dump_sector_state(void) {
+    void *(*op_new)(size_t) = GH(0x2728e0);
+    void (*msg_ctor)(void *) = GH(0x346be4);          /* SectorStateMessage */
+    uint8_t *(*msg_stream)(void *) = GH(0x9a6a98);
+    void (*reset_bits)(void *) = GH(0x788294);
+    void (*battle_encode)(void *, void *, int, void *, int) = GH(0x9076c4);
+    void (*battle_encode_tail)(void *, void *, int, int) = GH(0x80e1b8);
+    uint8_t *(*game_mode)(void) = GH(0x5952bc);
+
+    uint8_t *mode = game_mode();
+    uint8_t *battle = mode ? *(uint8_t **)(mode + 0x68) : NULL;
+    if (!battle) { LOG("sector dump: no battle"); return; }
+    void *msg = op_new(0x88);
+    msg_ctor(msg);
+    uint8_t *s = msg_stream(msg);
+    void **vt = *(void ***)s;
+    ((void (*)(void *, int))vt[0x70 / 8])(s, 0);      /* writeByte 0 */
+    reset_bits(s);
+    ((void (*)(void *, int))vt[0x40 / 8])(s, 1);      /* writeBoolean: full */
+    battle_encode(battle, s, 1, NULL, 0);
+    int mid = *(int32_t *)(s + 0x14);
+    battle_encode_tail(battle, s, 1, 0);
+    int len = *(int32_t *)(s + 0x14);
+    const uint8_t *buf = *(uint8_t **)(s + 0x20);
+    LOG("sector dump: %d bytes (battle part ends at %d)", len, mid);
+    static const char hx[] = "0123456789abcdef";
+    char line[1100];
+    for (int off = 0; off < len; off += 512) {
+        int n = len - off < 512 ? len - off : 512, l = 0;
+        for (int i = 0; i < n; i++) {
+            line[l++] = hx[buf[off + i] >> 4];
+            line[l++] = hx[buf[off + i] & 15];
+        }
+        line[l] = 0;
+        LOG("sector %05d %s", off, line);
+    }
+}
+
+static void watch_sector_dump(int state) {
+    static int ms, done;
+    if (state != 5 || !battle_mode) { ms = done = 0; return; }
+    if (done || (ms += 10) < 2000) return;
+    done = 1;
+    dump_sector_state();
+}
+#endif
+
 static void watch_tutorial(uint8_t *gm, int state) {
     static int battle_ms, finished;
     if (!tutorial) return;
@@ -1014,6 +1067,9 @@ static void battles_main(void) {
             }
         }
         watch_result(gm, state);
+#ifdef CMOFFLINE_SECTOR_DUMP
+        watch_sector_dump(state);
+#endif
         {
             static int table6_logged;
             if (state == 4 && !table6_logged++) log_table6();

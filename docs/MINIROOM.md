@@ -91,6 +91,17 @@ int and long of GameRoomMembers.
 - UdpConnectionInfo 23036 (decoder 0x7f93f0): a VInt, a string, an int,
   bytes; handler 0x4559bc. Open: whether battles also run over TCP.
 
+## Test: the client's own SectorState (`SECTOR_DUMP=on`)
+
+A build with `SECTOR_DUMP=on` makes the hook write every bot battle, 2 s in,
+the way 0x876d18 does (a SectorStateMessage's stream: byte 0, `true`,
+0x9076c4, 0x80e1b8) and log the bytes (`sector dump: N bytes`, then
+`sector <offset> <hex>` lines of 512 bytes). Stream fields: +0x14 the write
+offset (= length), +0x20 the buffer, +0x28 the capacity; vtable +0x70
+writeByte. It runs on the hook's thread while the battle runs, so it is
+for test builds only. Next: send these bytes from the server as SectorState
+and see whether the client plays the battle.
+
 ## Waydroid as a second phone (dropped)
 
 On an Intel PC with libhoudini (14.0.0_z.GoogleGame) the game, the

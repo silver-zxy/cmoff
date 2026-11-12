@@ -22,6 +22,8 @@
 #   play the real account.
 # WIN_FRAGMENTS=on|off (standalone, default off): won battles also bring
 # fragments; the original gave gold only (cmserver -win-fragments).
+# SECTOR_DUMP=on|off (both, default off): a test for the Mini Room, the hook
+# logs every bot battle as the client's own SectorState (docs/MINIROOM.md).
 # CHESTS=on|off (standalone, default on): rewards (win fragments, upgrade
 # exp, level chests) come as chests opened in the home, or straight into the
 # account (cmserver -chests).
@@ -58,6 +60,11 @@ find_cc() {
 build_hook() {   # "$@": extra -D flags
     find_cc
     mkdir -p "$OUT"
+    case "${SECTOR_DUMP:=off}" in
+    on) set -- "$@" -DCMOFFLINE_SECTOR_DUMP; echo "sector dump: on (logs every bot battle's SectorState)" ;;
+    off) ;;
+    *) die "SECTOR_DUMP must be on or off" ;;
+    esac
     "$CC" -shared -fPIC -O2 -Wall -Wextra "$@" \
         -o "$OUT/libcmoffline.so" "$ROOT/cmoffline/src/cmoffline.c" -llog -ldl
 }
