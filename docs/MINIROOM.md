@@ -65,9 +65,26 @@ int and long of GameRoomMembers.
 - The content is the whole start of the battle (players, decks, shop,
   timings), not a small header. A captured battle kept the tutorial's
   rules (reference/SERVER.md).
-- Idea: the client builds battles itself (0x940664 for the bot battles).
-  If it can also write a battle in SectorState's format, the host's client
-  builds the battle and the meeting point hands the same bytes to both.
+- SectorState's content, read by 0x605eb8: a boolean; if set, the whole
+  battle (0x31eb28: VInt 42 as a version, then the battle's parts, each
+  behind a boolean); then 0x6ed534(battle, stream, 1, message) (ticks and
+  state, VInts).
+- **The client can write it itself.** The battle's encoder is 0x9076c4
+  (battle, stream, full, 0, 0): writeVInt(42), then the same parts as
+  0x31eb28. Offline, the client's local message layer (0x87641c) answers
+  its own RequestSectorState 17918 (0x876ae4 → 0x876d18): it makes a
+  SectorStateMessage (0x346be4, vtable 0xea6710), writes `true`, the
+  battle (0x9076c4(game mode +0x68, stream, 1, 0, 0)) and 0x80e1b8
+  (battle, stream, 1, 0), the counterpart of 0x6ed534, and hands it to
+  itself as if from a server. Other callers of 0x9076c4: 0x940d20 (in the
+  bot battle builder), 0x7f5a24, 0x7f1b24, 0x955854.
+- So the plan: the host's client builds the battle, writes it with its own
+  encoder, and the meeting point hands the same bytes to both clients as
+  SectorState. Nobody rebuilds the format.
+- The bot battle builder 0x940664 puts the battle's avatars together in
+  two loops (0x9408bc, 0x940978: ids -1, -2 …, 0x7ff7cc, 0x3113b0,
+  0x8f256c) and creates the battle with 0x548e00. For two players the
+  second avatar is the guest instead of the bot.
 - SectorHeartbeat 27199: handler 0x454d20 → 0x559ee4(game mode, message).
 - Lockstep checksums: 0x994008 ("Check sum mismatch. Request full
   update.").
