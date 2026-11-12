@@ -90,7 +90,13 @@ func CmServerStart(dataDir, keyHex, options *C.char) C.int {
 			log.Printf("dev: %s", acc.DevStart())
 		}
 		log.Printf("account %q in %s, progression %v, dev %v", acc.Name, dir, acc.Progression, home.Dev)
-		s := srv.New(key, acc, srv.Options{BattleOnline: true})
+		o := srv.Options{BattleOnline: true}
+		if opts["sectortest"] == "on" {
+			// docs/MINIROOM.md: the hook (SECTOR_DUMP=on) writes sector.bin
+			// in a bot battle; the next duel gets it as SectorState
+			o.SectorFile, o.SectorOnce = filepath.Join(dir, "sector.bin"), true
+		}
+		s := srv.New(key, acc, o)
 		go func() { log.Printf("server stopped: %v", s.Serve(ln)) }()
 	})
 	return ret

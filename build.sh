@@ -22,8 +22,10 @@
 #   play the real account.
 # WIN_FRAGMENTS=on|off (standalone, default off): won battles also bring
 # fragments; the original gave gold only (cmserver -win-fragments).
-# SECTOR_DUMP=on|off (both, default off): a test for the Mini Room, the hook
-# logs every bot battle as the client's own SectorState (docs/MINIROOM.md).
+# SECTOR_DUMP=on|off (both, default off): a test for the Mini Room
+# (docs/MINIROOM.md). The hook logs a bot battle as the client's own
+# SectorState; standalone, it also saves it and the next duel is that battle,
+# run by the server (bot battle and test take turns).
 # CHESTS=on|off (standalone, default on): rewards (win fragments, upgrade
 # exp, level chests) come as chests opened in the home, or straight into the
 # account (cmserver -chests).
@@ -110,7 +112,7 @@ standalone)
     opt=$PROGRESSION
     [ "$opt" = reset ] && opt="reset:$(date +%s)"
     build_hook -DCMOFFLINE_NO_CRASH_LOGGER -DCMOFFLINE_LOCAL_SERVER "-DSERVER_KEY_HEX=\"$priv\"" \
-        "-DCMSERVER_OPTIONS=\"progression=$opt tutorial=$TUTORIAL chests=$CHESTS live=$LIVE winfragments=$WIN_FRAGMENTS dev=$DEV\""
+        "-DCMSERVER_OPTIONS=\"progression=$opt tutorial=$TUTORIAL chests=$CHESTS live=$LIVE winfragments=$WIN_FRAGMENTS dev=$DEV sectortest=${SECTOR_DUMP:-off}\""
     python3 "$ROOT/cmoffline/tools/patch_apk.py" "$apk" "$OUT/libcmoffline.so" \
         "$OUT/unsigned.apk" "$pub" --add-lib "$OUT/libcmserver.so" \
         --help-page "$ROOT/cmoffline/help/help.html"

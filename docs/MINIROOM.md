@@ -85,7 +85,14 @@ int and long of GameRoomMembers.
   two loops (0x9408bc, 0x940978: ids -1, -2 …, 0x7ff7cc, 0x3113b0,
   0x8f256c) and creates the battle with 0x548e00. For two players the
   second avatar is the guest instead of the bot.
-- SectorHeartbeat 27199: handler 0x454d20 → 0x559ee4(game mode, message).
+- SectorHeartbeat 27199 (server → client, decoder 0x341f9c): VInt end
+  (+0x88), VInt (+0x84), then, if more bytes follow, VInt n (at most 1000)
+  and n commands (0x486c50, the command factory), then optionally a
+  boolean and a debug block. Handler 0x454d20 → 0x559ee4 → 0x5b76c4 →
+  0x51e518(battle, end × 10, +0x84, message): the client may simulate up to
+  end × 10 (battle +0x1cc), and the commands go to their ticks.
+- SectorCommand 16634 (client → server, encoder 0x8c60a4): VInt (+0x90),
+  VInt (+0x94), boolean, then the command (0x315084).
 - Lockstep checksums: 0x994008 ("Check sum mismatch. Request full
   update.").
 - UdpConnectionInfo 23036 (decoder 0x7f93f0): a VInt, a string, an int,
@@ -101,6 +108,25 @@ offset (= length), +0x20 the buffer, +0x28 the capacity; vtable +0x70
 writeByte. It runs on the hook's thread while the battle runs, so it is
 for test builds only. Next: send these bytes from the server as SectorState
 and see whether the client plays the battle.
+
+First dump (12 November 2026, a duel against the bot): 2362 bytes, no
+crash, the battle went on to its end. The battle part ends at 385 (both
+players with names, decks, the board), then the players' states, and the
+quests copied into the battle (TID_CHRONOS_QUESTS_…). The first build cut
+the log lines at 1023 characters (`__android_log_print`); now 256 bytes a
+line.
+
+## Test 2: the server runs the battle
+
+Standalone with `SECTOR_DUMP=on` (server option `sectortest=on`): the
+hook also saves the dump as `files/sector.bin`. The next duel then gets no
+bot signal: the server sends that SectorState and a heartbeat every 100 ms
+(end +1 each, no commands) and renames the file (`sector.bin-used`), so bot
+battle and test take turns. On a PC: `cmserver -sector-test <log or .bin>`
+(`-sector-interval`, `-sector-step`). What to see: whether the client
+loads the battle, answers SectorStateOk, plays at the right speed (end × 10
+is a guess at the unit), and what it sends (SectorCommand when a mini is
+placed).
 
 ## Waydroid as a second phone (dropped)
 

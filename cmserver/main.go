@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	"cmserver/home"
 	"cmserver/srv"
@@ -28,6 +29,9 @@ func main() {
 	chests := flag.Bool("chests", true, "rewards come as chests to open in the home (-chests=false: straight into the account)")
 	tutorial := flag.Bool("tutorial", true, "new accounts play the game's tutorial (-tutorial=false: skip it)")
 	dev := flag.Bool("dev", false, "dev mode: every currency at its top, the road's fuel, every quest done (refilled with every home); saved in accounts-dev.json unless -accounts says otherwise")
+	sectorTest := flag.String("sector-test", "", "Mini Room test (docs/MINIROOM.md): a log with the hook's sector dump (or its raw .bin); a duel then gets that SectorState and heartbeats instead of the bot battle")
+	sectorInterval := flag.Duration("sector-interval", 100*time.Millisecond, "sector test: time between heartbeats")
+	sectorStep := flag.Int("sector-step", 1, "sector test: how much each heartbeat raises the end (the client simulates up to end*10)")
 	progression := flag.String("progression", "", "fresh: earn the collection (starts once, then resumes); reset: start over; unlocked: everything unlocked; empty: as saved")
 	flag.Parse()
 
@@ -76,6 +80,7 @@ func main() {
 	log.Printf("account %s: %q, deck %d %v, progression %v", *accPath, acc.Name, acc.Selected,
 		acc.Decks[acc.Selected], acc.Progression)
 
-	s := srv.New(key, acc, srv.Options{Trace: *trace, BattleOnline: *battleOnline, SignalEmpty: *signalEmpty})
+	s := srv.New(key, acc, srv.Options{Trace: *trace, BattleOnline: *battleOnline, SignalEmpty: *signalEmpty,
+		SectorFile: *sectorTest, SectorInterval: *sectorInterval, SectorStep: *sectorStep})
 	log.Fatal(s.ListenAndServe(*addr))
 }

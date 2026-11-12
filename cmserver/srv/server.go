@@ -9,6 +9,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"cmserver/home"
 	"cmserver/pepper"
@@ -25,6 +26,16 @@ type Options struct {
 	// SignalEmpty sends the battle signal as an empty KeepAliveServer (the
 	// hook then always starts a duel) instead of padding it with the mode.
 	SignalEmpty bool
+	// SectorFile (docs/MINIROOM.md): while this file exists, a duel gets
+	// the SectorState in it (the client's own, from the hook's SECTOR_DUMP:
+	// raw bytes, or a log with the dump lines) and heartbeats, every
+	// SectorInterval with the end raised by SectorStep, instead of the bot
+	// battle. SectorOnce renames the file after use (…-used), so the next
+	// duel is a bot battle again and makes a new dump.
+	SectorFile     string
+	SectorOnce     bool
+	SectorInterval time.Duration
+	SectorStep     int
 }
 
 // BattleSignalLen is the padding of the battle signal: the hook reads the
@@ -49,6 +60,8 @@ type Server struct {
 	key  *pepper.Keypair
 	acc  *home.Account
 	opts Options
+
+	sendMu sync.Mutex // the session's nonces: one frame at a time
 
 	mu      sync.Mutex
 	pending battle // the bot battle the client is playing, until its result
@@ -135,6 +148,14 @@ func (s *Server) handle(c net.Conn) {
 	log.Printf("conn from %s", c.RemoteAddr())
 	var sess *pepper.Session
 	var shNonce []byte
+	var sectorStop chan struct{} // the running sector test's heartbeats
+	stopSector := func() {
+		if sectorStop != nil {
+			close(sectorStop)
+			sectorStop = nil
+		}
+	}
+	defer stopSector()
 
 	for {
 		f, err := proto.ReadFrame(c)
@@ -247,7 +268,15 @@ func (s *Server) handle(c net.Conn) {
 				// a season's end waiting for the home's chests
 				s.sendSeasonEnd(c, sess)
 			}
+			var sector []byte
 			if mode > 0 {
+				sector = s.sectorState()
+			}
+			if sector != nil {
+				stopSector()
+				sectorStop = make(chan struct{})
+				s.startSectorTest(c, sess, sector, sectorStop)
+			} else if mode > 0 {
 				// Battle signal for the client hook: a KeepAliveServer the
 				// client did not ask for. Its body is padded with
 				//   mode + 100 (keep the battle offline throughout)
@@ -314,6 +343,7 @@ func (s *Server) handle(c net.Conn) {
 
 		case proto.GoHome:
 			// Exit after a bot battle: back to the (saved) home.
+			stopSector()
 			s.sendHome(c, sess)
 
 		default:
@@ -462,6 +492,8 @@ func printable(p []byte) string {
 }
 
 func (s *Server) send(c net.Conn, sess *pepper.Session, id uint16, body []byte) {
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
 	if sess != nil {
 		body = sess.Encrypt(body)
 	}

@@ -877,6 +877,9 @@ static void watch_reload(void) {
  * RequestSectorState (0x876d18), and log the bytes. Runs on this thread,
  * not the game's, once per battle 2 s in (a test build only). */
 #define GH(a) G((a) - GHIDRA_BASE)
+#ifdef CMOFFLINE_LOCAL_SERVER
+static int app_files_dir(char *out, size_t n);
+#endif
 static void dump_sector_state(void) {
     void *(*op_new)(size_t) = GH(0x2728e0);
     void (*msg_ctor)(void *) = GH(0x346be4);          /* SectorStateMessage */
@@ -902,10 +905,23 @@ static void dump_sector_state(void) {
     int len = *(int32_t *)(s + 0x14);
     const uint8_t *buf = *(uint8_t **)(s + 0x20);
     LOG("sector dump: %d bytes (battle part ends at %d)", len, mid);
+#ifdef CMOFFLINE_LOCAL_SERVER
+    /* for the in-game server's sector test (sectortest=on): the next duel
+     * gets this battle as SectorState */
+    char path[300];
+    if (!app_files_dir(path, sizeof path - 16)) {
+        strcat(path, "/sector.bin");
+        FILE *f = fopen(path, "wb");
+        if (f && fwrite(buf, 1, len, f) == (size_t)len) LOG("sector dump: wrote %s", path);
+        else LOG("sector dump: cannot write %s", path);
+        if (f) fclose(f);
+    }
+#endif
+    /* __android_log_print cuts a line at 1023 characters: 256 bytes a line */
     static const char hx[] = "0123456789abcdef";
-    char line[1100];
-    for (int off = 0; off < len; off += 512) {
-        int n = len - off < 512 ? len - off : 512, l = 0;
+    char line[600];
+    for (int off = 0; off < len; off += 256) {
+        int n = len - off < 256 ? len - off : 256, l = 0;
         for (int i = 0; i < n; i++) {
             line[l++] = hx[buf[off + i] >> 4];
             line[l++] = hx[buf[off + i] & 15];
