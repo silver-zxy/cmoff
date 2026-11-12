@@ -128,6 +128,36 @@ loads the battle, answers SectorStateOk, plays at the right speed (end × 10
 is a guess at the unit), and what it sends (SectorCommand when a mini is
 placed).
 
+**Result (12 November 2026): it works.** The second duel came from the
+server: the client loaded the SectorState, answered SectorStateOk (17239,
+empty) at once, played the whole battle at the right speed (heartbeats
+every 100 ms, end +1: end × 10 is in ms, or close enough) with the bot
+acting, showed the end and went home with GoHome. So a battle run from
+outside the client works, with the client's own SectorState.
+
+What the client sent during the battle: no SectorCommand. Its commands
+came in EndClientTurn (17306) about every 10 s, as in the bot battles
+(our parser logs them as unknown command 34, 37, 39, 51): the player's
+moves of a round, each with its tick. For two players, the meeting point
+passes these on to the other client inside the heartbeats (commands at
+their ticks, 0x51e518).
+
+## Next
+
+1. The commands: decode the battle commands in EndClientTurn (34, 37, 39,
+   51 …) and send them back in a heartbeat to the same client first (it
+   must accept its own moves from the server, as in the original).
+2. Two humans in one battle: in the dump the second player is the bot
+   ("Jeff", a negative id, AI). Find how the battle marks a player as human
+   and how a client finds itself in it (its account id), and build the
+   battle with the guest's avatar (bot battle builder 0x940664, the avatar
+   loops).
+3. Account ids: our server gives every account the id 1-0
+   (home/ownhome.go). Two phones need different ids (random at the
+   account's creation).
+4. The fake player (Go): joins a room, takes the SectorState, sends empty
+   turns.
+
 ## Waydroid as a second phone (dropped)
 
 On an Intel PC with libhoudini (14.0.0_z.GoogleGame) the game, the
